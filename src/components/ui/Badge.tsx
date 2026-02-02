@@ -6,14 +6,16 @@ import React from 'react';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'outline' | 'destructive';
   size?: 'sm' | 'md';
+  className?: string;
 }
 
 export function Badge({
   children,
   variant = 'default',
   size = 'md',
+  className = '',
 }: BadgeProps) {
   const variantStyles = {
     default: 'bg-gray-100 text-gray-700',
@@ -21,6 +23,8 @@ export function Badge({
     warning: 'bg-yellow-100 text-yellow-700',
     danger: 'bg-red-100 text-red-700',
     info: 'bg-blue-100 text-blue-700',
+    outline: 'bg-transparent border border-gray-300 text-gray-700',
+    destructive: 'bg-red-100 text-red-700',
   };
 
   const sizeStyles = {
@@ -34,6 +38,7 @@ export function Badge({
         inline-flex items-center font-medium rounded-full
         ${variantStyles[variant]}
         ${sizeStyles[size]}
+        ${className}
       `}
     >
       {children}

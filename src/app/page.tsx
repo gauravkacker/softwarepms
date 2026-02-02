@@ -1,6 +1,7 @@
 // ============================================
 // Main Dashboard Page
 // Single-workspace interface based on Module 1
+// Updated for Module 2: User Roles & Permissions
 // ============================================
 
 'use client';
@@ -11,20 +12,29 @@ import { Header } from '@/components/layout/Header';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
-import { db } from '@/lib/db/database';
+import { useAuth } from '@/lib/auth/auth-context';
+import { db, seedModule2Data } from '@/lib/db/database';
 import type { Patient, Appointment, QueueItem, MateriaMedica } from '@/types';
 
 // Seed initial data on first load
 if (typeof window !== 'undefined') {
   const hasSeeded = localStorage.getItem('pms_seeded');
+  const hasSeededModule2 = localStorage.getItem('pms_module2_seeded');
+  
   if (!hasSeeded) {
     db.seedInitialData();
     localStorage.setItem('pms_seeded', 'true');
+  }
+  
+  if (!hasSeededModule2) {
+    seedModule2Data();
+    localStorage.setItem('pms_module2_seeded', 'true');
   }
 }
 
 export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { user, isAuthenticated } = useAuth();
   
   // Load dashboard data
   const patients = db.getAll<Patient>('patients');
@@ -45,6 +55,10 @@ export default function Dashboard() {
     queue.filter(q => q.status === 'waiting').slice(0, 5)
   );
 
+  // Get user display name
+  const userDisplayName = user?.name || 'Dr. Smith';
+  const userRole = user?.roleId || 'Doctor';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
@@ -54,7 +68,7 @@ export default function Dashboard() {
           sidebarCollapsed ? 'ml-16' : 'ml-64'
         }`}
       >
-        <Header title="Dashboard" subtitle="Welcome back, Dr. Smith" />
+        <Header title="Dashboard" subtitle={`Welcome back, ${userDisplayName}`} />
 
         <main className="p-6">
           {/* Stats Grid */}

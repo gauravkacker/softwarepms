@@ -225,6 +225,146 @@ export interface AppSettings {
   };
 }
 
+// ============================================
+// Module 2: User Roles, Permissions & Login System
+// ============================================
+
+// Login Mode Types
+export type LoginMode = 'none' | 'basic' | 'role';
+
+// Permission Categories
+export type PermissionCategory = 
+  | 'clinical' 
+  | 'operational' 
+  | 'financial' 
+  | 'pharmacy' 
+  | 'system';
+
+// Permission Action Types
+export interface Permission {
+  id: string;
+  category: PermissionCategory;
+  name: string;
+  key: string; // e.g., 'view_case', 'edit_case', 'book_appointment'
+  description: string;
+  enabled: boolean;
+}
+
+// Role Definition
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  isSystem: boolean; // System roles cannot be deleted
+  permissions: Record<string, boolean>; // permissionKey -> boolean
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// User Types
+export type UserIdentifierType = 'email' | 'mobile' | 'username';
+
+export interface User {
+  id: string;
+  username: string;
+  identifierType: UserIdentifierType;
+  identifier: string; // email, mobile, or username value
+  password?: string; // Optional, hashed
+  pin?: string; // Optional PIN for quick access
+  roleId: string;
+  isActive: boolean;
+  isDoctor: boolean; // Only one doctor per system
+  name: string;
+  phone?: string;
+  email?: string;
+  profileImage?: string;
+  lastLogin?: Date;
+  lastActivity?: Date;
+  deviceTokens?: string[]; // For multi-device support
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Session Management
+export interface UserSession {
+  id: string;
+  userId: string;
+  deviceId: string;
+  deviceName: string;
+  ipAddress: string;
+  isActive: boolean;
+  lastActivity: Date;
+  createdAt: Date;
+}
+
+// Activity Log
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  module: string;
+  details: Record<string, unknown>;
+  patientId?: string; // Optional, for patient-related actions
+  ipAddress: string;
+  timestamp: Date;
+}
+
+// Staff Message
+export interface StaffMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  recipientName: string;
+  subject?: string;
+  content: string;
+  priority: 'normal' | 'urgent' | 'critical';
+  readAt?: Date;
+  createdAt: Date;
+}
+
+// Role Template
+export interface RoleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  roleIds: string[];
+  createdAt: Date;
+}
+
+// Emergency Mode
+export interface EmergencyMode {
+  enabled: boolean;
+  enabledBy: string;
+  enabledAt: Date;
+  reason?: string;
+  restrictionsDisabled: boolean;
+}
+
+// Frontdesk Override
+export interface FrontdeskOverride {
+  enabled: boolean;
+  enabledBy: string;
+  enabledAt: Date;
+  expiresAt?: Date;
+}
+
+// Authentication State
+export interface AuthState {
+  isAuthenticated: boolean;
+  user: User | null;
+  role: Role | null;
+  loginMode: LoginMode;
+  sessionId: string | null;
+  emergencyMode: boolean;
+  frontdeskOverride: boolean;
+}
+
+// ============================================
+// Module 2 END
+// ============================================
+
 // Utility Types
 export interface PaginationParams {
   page: number;
