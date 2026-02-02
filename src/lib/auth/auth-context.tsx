@@ -46,15 +46,41 @@ function generateSessionId(): string {
 
 // Provider Component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    isAuthenticated: false,
-    user: null,
-    role: null,
-    loginMode: DEFAULT_LOGIN_MODE,
-    sessionId: null,
-    emergencyMode: false,
-    frontdeskOverride: false,
-  });
+  // Lazy initialization function
+  const initializeAuth = useCallback(() => {
+    // Ensure Module 2 data is seeded
+    ensureModule2DataSeeded();
+    
+    // Check if we should auto-login in 'none' mode
+    if (DEFAULT_LOGIN_MODE === 'none') {
+      const doctorRole = roleDb.getById('role-doctor') as Role;
+      const doctorUser = userDb.getById('user-doctor') as User;
+      
+      if (doctorRole && doctorUser) {
+        return {
+          isAuthenticated: true,
+          user: doctorUser,
+          role: doctorRole,
+          loginMode: 'none' as const,
+          sessionId: generateSessionId(),
+          emergencyMode: false,
+          frontdeskOverride: false,
+        };
+      }
+    }
+    
+    return {
+      isAuthenticated: false,
+      user: null,
+      role: null,
+      loginMode: DEFAULT_LOGIN_MODE,
+      sessionId: null,
+      emergencyMode: false,
+      frontdeskOverride: false,
+    };
+  }, []);
+
+  const [authState, setAuthState] = useState<AuthState>(initializeAuth);
 
   const [emergencyMode, setEmergencyMode] = useState<EmergencyMode>({
     enabled: false,
@@ -102,30 +128,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, [authState.user]);
-
-  // Initialize - check login mode and set default state
-  useEffect(() => {
-    // Ensure Module 2 data is seeded before checking for doctor
-    ensureModule2DataSeeded();
-    
-    if (authState.loginMode === 'none') {
-      // No login mode - auto-login as doctor
-      const doctorRole = roleDb.getById('role-doctor') as Role;
-      const doctorUser = userDb.getById('user-doctor') as User;
-      
-      if (doctorRole && doctorUser) {
-        setAuthState({
-          isAuthenticated: true,
-          user: doctorUser,
-          role: doctorRole,
-          loginMode: 'none',
-          sessionId: generateSessionId(),
-          emergencyMode: false,
-          frontdeskOverride: false,
-        });
-      }
-    }
-  }, [authState.loginMode]);
 
   // Login function (Module 2.5)
   const login = useCallback(async (identifier: string, password?: string): Promise<boolean> => {

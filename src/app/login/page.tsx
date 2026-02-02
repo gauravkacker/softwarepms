@@ -52,7 +52,7 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600 mb-4">
-              This clinic is running in "No Login" mode.
+              This clinic is running in &quot;No Login&quot; mode.
               All users have full access to the system.
             </p>
             <Button onClick={() => router.push('/')} className="w-full">

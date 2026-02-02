@@ -24,7 +24,7 @@ export default function ActivityLogPage() {
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-gray-500">Access Denied</p>
-            <p className="text-sm text-gray-400">You don't have permission to view activity logs.</p>
+            <p className="text-sm text-gray-400">You don&apos;t have permission to view activity logs.</p>
           </CardContent>
         </Card>
       </div>

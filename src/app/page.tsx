@@ -35,10 +35,6 @@ export default function Dashboard() {
       localStorage.setItem('pms_module2_seeded', 'true');
     }
   }, []);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { user, isAuthenticated } = useAuth();
-  
-  // Load dashboard data
   const patients = db.getAll<Patient>('patients');
   const appointments = db.getAll<Appointment>('appointments');
   const queue = db.getAll<QueueItem>('queue');

@@ -26,7 +26,7 @@ export default function UsersPage() {
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-gray-500">Access Denied</p>
-            <p className="text-sm text-gray-400">You don't have permission to manage users.</p>
+            <p className="text-sm text-gray-400">You don&apos;t have permission to manage users.</p>
           </CardContent>
         </Card>
       </div>

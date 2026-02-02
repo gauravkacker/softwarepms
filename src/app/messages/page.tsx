@@ -24,10 +24,14 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (user) {
-      const userMessages = staffMessageDb.getByUser(user.id) as StaffMessage[];
-      setMessages(userMessages.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ));
+      const loadMessages = () => {
+        const userMessages = staffMessageDb.getByUser(user.id) as StaffMessage[];
+        const sortedMessages = userMessages.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setMessages(sortedMessages);
+      };
+      loadMessages();
     }
   }, [user]);
 
