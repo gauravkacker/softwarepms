@@ -6,7 +6,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import type { User, Role, AuthState, LoginMode, ActivityLog, EmergencyMode, FrontdeskOverride } from '@/types';
-import { userDb, roleDb, activityLogDb, sessionDb } from '@/lib/db/database';
+import { userDb, roleDb, activityLogDb, sessionDb, ensureModule2DataSeeded } from '@/lib/db/database';
 
 // Default login mode (Module 2.4)
 const DEFAULT_LOGIN_MODE: LoginMode = 'none';
@@ -105,6 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize - check login mode and set default state
   useEffect(() => {
+    // Ensure Module 2 data is seeded before checking for doctor
+    ensureModule2DataSeeded();
+    
     if (authState.loginMode === 'none') {
       // No login mode - auto-login as doctor
       const doctorRole = roleDb.getById('role-doctor') as Role;

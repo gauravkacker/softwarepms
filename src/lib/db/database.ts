@@ -651,3 +651,16 @@ export const roleTemplateDb = {
     return template;
   },
 };
+
+// Ensure Module 2 data is seeded (called before auth operations)
+let module2Seeded = false;
+export function ensureModule2DataSeeded(): void {
+  if (module2Seeded) return;
+  
+  // Check if roles exist
+  const roles = db.getAll('roles');
+  if (roles.length === 0) {
+    seedModule2Data();
+    module2Seeded = true;
+  }
+}
