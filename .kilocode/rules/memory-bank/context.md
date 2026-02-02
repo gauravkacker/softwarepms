@@ -2,12 +2,13 @@
 
 ## Current State
 
-**Project Status**: ✅ Foundation Complete - Dashboard Ready
+**Project Status**: ✅ Module 2 Complete - User Roles & Login System
 
-Building a modular, offline-first Practice Management System for homeopathic clinics based on Module 1 architecture specification.
+Building a modular, offline-first Practice Management System for homeopathic clinics based on Module 1 & Module 2 architecture specifications.
 
 ## Recently Completed
 
+### Module 1 - Foundation
 - [x] Base Next.js 16 setup with App Router
 - [x] TypeScript configuration with strict mode
 - [x] Tailwind CSS 4 integration
@@ -21,7 +22,18 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 - [x] Layout components: Sidebar, Header
 - [x] Main dashboard with single-workspace interface
 - [x] Sample data seeded (patients, materia medica, fees)
-- [x] Memory bank updated with PMS requirements
+
+### Module 2 - User Roles & Permissions
+- [x] User, Role, Permission type definitions
+- [x] Authentication context with permission engine
+- [x] Login page supporting 3 modes (none/basic/role)
+- [x] User management page for Doctor
+- [x] Role-based permission editor
+- [x] Activity logging system for audit trails
+- [x] Staff messaging system
+- [x] Emergency mode feature
+- [x] Frontdesk override feature
+- [x] Sidebar updates based on user permissions
 
 ## Architecture Overview (Module 1)
 
@@ -56,7 +68,12 @@ src/
 │   ├── layout.tsx          # Root layout + metadata
 │   ├── page.tsx            # Dashboard page
 │   ├── globals.css         # Tailwind imports + global styles
-│   └── favicon.ico         # Site icon
+│   ├── favicon.ico         # Site icon
+│   ├── login/              # Login page (Module 2)
+│   ├── messages/           # Staff messaging (Module 2)
+│   └── admin/              # Admin section (Module 2)
+│       ├── activity-log/   # Activity log page
+│       └── users/          # User management page
 ├── components/             # Reusable components
 │   ├── ui/                 # UI primitives
 │   │   ├── Button.tsx      # Button component
@@ -67,6 +84,8 @@ src/
 │       ├── Sidebar.tsx     # Navigation sidebar
 │       └── Header.tsx      # Page header
 ├── lib/                    # Utilities and helpers
+│   ├── auth/               # Authentication (Module 2)
+│   │   └── auth-context.tsx # Auth context & hooks
 │   └── db/                 # Local database
 │       └── database.ts     # Offline-first data layer
 ├── modules/                # Modular architecture (to be created)
@@ -81,7 +100,7 @@ src/
 │   ├── fees/               # Fees & Billing
 │   └── reports/            # Reports
 └── types/                  # TypeScript types
-    └── index.ts            # All domain types
+    └── index.ts            # All domain types + Module 2 types
 ```
 
 ## Next Steps
@@ -124,6 +143,7 @@ bun start
 |------|---------|
 | 2026-02-02 | Initial setup, verified build, updated architecture for PMS |
 | 2026-02-02 | Created modular structure, types, database, UI components, dashboard |
+| 2026-02-02 | Module 2: User roles, permissions, login, activity log, messaging |
 
 ## Key Architecture Rules (from Module 1)
 
