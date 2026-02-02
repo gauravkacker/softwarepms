@@ -16,8 +16,8 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { db, seedModule2Data } from '@/lib/db/database';
 import type { Patient, Appointment, QueueItem, MateriaMedica } from '@/types';
 
-// Seed initial data on first load
-if (typeof window !== 'undefined') {
+// Seed initial data on first load (client only to avoid hydration issues)
+useEffect(() => {
   const hasSeeded = localStorage.getItem('pms_seeded');
   const hasSeededModule2 = localStorage.getItem('pms_module2_seeded');
   
@@ -30,7 +30,7 @@ if (typeof window !== 'undefined') {
     seedModule2Data();
     localStorage.setItem('pms_module2_seeded', 'true');
   }
-}
+}, []);
 
 export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
