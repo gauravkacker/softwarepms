@@ -1,10 +1,10 @@
-# Active Context: Next.js Starter Template
+# Active Context: Practice Management System (PMS) for Homeopathic Clinics
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
+**Project Status**: ✅ Foundation Complete - Dashboard Ready
 
-The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. It's ready for AI-assisted expansion to build any type of application.
+Building a modular, offline-first Practice Management System for homeopathic clinics based on Module 1 architecture specification.
 
 ## Recently Completed
 
@@ -12,76 +12,126 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 - [x] TypeScript configuration with strict mode
 - [x] Tailwind CSS 4 integration
 - [x] ESLint configuration
-- [x] Memory bank documentation
-- [x] Recipe system for common features
+- [x] Dependencies installed and verified
+- [x] Build verification passed
+- [x] Modular directory structure created
+- [x] Core type definitions for all data domains
+- [x] Local database infrastructure (offline-first)
+- [x] UI components: Button, Card, Input, Badge
+- [x] Layout components: Sidebar, Header
+- [x] Main dashboard with single-workspace interface
+- [x] Sample data seeded (patients, materia medica, fees)
+- [x] Memory bank updated with PMS requirements
 
-## Current Structure
+## Architecture Overview (Module 1)
 
-| File/Directory | Purpose | Status |
-|----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Global styles | ✅ Ready |
-| `.kilocode/` | AI context & recipes | ✅ Ready |
+### Design Philosophy
+- ✅ **Offline-first**: Works 100% without internet
+- ✅ **Local data source of truth**: All critical data stored locally
+- ✅ **Modular architecture**: Independent, pluggable modules
 
-## Current Focus
+### Phase-1 Features (Foundation)
+1. ✅ Dashboard - Overview and stats
+2. [ ] PMS Module - Patient management
+3. [ ] Appointment Scheduler
+4. [ ] Queue Management
+5. [ ] Doctor Panel (Manual)
+6. [ ] Prescription Engine
+7. [ ] Pharmacy (Manual)
+8. [ ] Materia Medica (Exact text search)
+9. [ ] Fees & Billing
+10. [ ] Reports (Basic)
 
-The template is ready. Next steps depend on user requirements:
+### Data Domains
+1. **Clinical Domain**: Patient, Case, Symptoms, Diagnosis, Prognosis
+2. **Operational Domain**: Appointments, Queue, Pharmacy, Staff actions
+3. **Financial Domain**: Fees, Receipts, Refunds, Reports
+4. **Knowledge Domain**: Materia Medica, Repertory, Doctor's notes
 
-1. What type of application to build
-2. What features are needed
-3. Design/branding preferences
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── layout.tsx          # Root layout + metadata
+│   ├── page.tsx            # Dashboard page
+│   ├── globals.css         # Tailwind imports + global styles
+│   └── favicon.ico         # Site icon
+├── components/             # Reusable components
+│   ├── ui/                 # UI primitives
+│   │   ├── Button.tsx      # Button component
+│   │   ├── Card.tsx        # Card component
+│   │   ├── Input.tsx       # Input, Textarea, Select
+│   │   └── Badge.tsx       # Badge, StatusBadge
+│   └── layout/             # Layout components
+│       ├── Sidebar.tsx     # Navigation sidebar
+│       └── Header.tsx      # Page header
+├── lib/                    # Utilities and helpers
+│   └── db/                 # Local database
+│       └── database.ts     # Offline-first data layer
+├── modules/                # Modular architecture (to be created)
+│   ├── core/               # Core shared functionality
+│   ├── pms/                # Patient Management System
+│   ├── appointments/       # Appointment Scheduler
+│   ├── queue/              # Queue Management
+│   ├── doctor-panel/       # Doctor Panel
+│   ├── prescription/       # Prescription Engine
+│   ├── pharmacy/           # Pharmacy Module
+│   ├── materia-medica/     # Materia Medica
+│   ├── fees/               # Fees & Billing
+│   └── reports/            # Reports
+└── types/                  # TypeScript types
+    └── index.ts            # All domain types
+```
+
+## Next Steps
+
+1. [ ] Build Patient Management module (add/edit/View patients)
+2. [ ] Build Appointment Scheduler
+3. [ ] Build Doctor Panel
+4. [ ] Build Queue Management
+5. [ ] Build Prescription Engine
+6. [ ] Build Pharmacy module
+7. [ ] Build Materia Medica search
+8. [ ] Build Billing & Fees
+9. [ ] Build Reports
+10. [ ] Add SQLite database for persistence
+11. [ ] Add data export/backup
 
 ## Quick Start Guide
 
-### To add a new page:
-
-Create a file at `src/app/[route]/page.tsx`:
-```tsx
-export default function NewPage() {
-  return <div>New page content</div>;
-}
+### To run the development server:
+```bash
+bun dev
 ```
+Then open http://localhost:3000 in your browser.
 
-### To add components:
-
-Create `src/components/` directory and add components:
-```tsx
-// src/components/ui/Button.tsx
-export function Button({ children }: { children: React.ReactNode }) {
-  return <button className="px-4 py-2 bg-blue-600 text-white rounded">{children}</button>;
-}
-```
-
-### To add a database:
-
-Follow `.kilocode/recipes/add-database.md`
-
-### To add API routes:
-
-Create `src/app/api/[route]/route.ts`:
-```tsx
-import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ message: "Hello" });
-}
+### To build for production:
+```bash
+bun run build
+bun start
 ```
 
 ## Available Recipes
 
 | Recipe | File | Use Case |
 |--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
-
-## Pending Improvements
-
-- [ ] Add more recipes (auth, email, etc.)
-- [ ] Add example components
-- [ ] Add testing setup recipe
+| Add Database | `.kilocode/recipes/add-database.md` | Local SQLite database setup |
 
 ## Session History
 
 | Date | Changes |
 |------|---------|
-| Initial | Template created with base setup |
+| 2026-02-02 | Initial setup, verified build, updated architecture for PMS |
+| 2026-02-02 | Created modular structure, types, database, UI components, dashboard |
+
+## Key Architecture Rules (from Module 1)
+
+- ✅ Offline-first - no API calls block UI
+- ✅ Local data is source of truth
+- ✅ Modular - each module independent
+- ✅ Phase-2/3 features won't break Phase-1
+- ✅ Single-workspace UI philosophy
+- ✅ Non-blocking UI - async operations
+- ✅ Settings as first-class citizen
+- ✅ Failure-safe design - isolated module failures
