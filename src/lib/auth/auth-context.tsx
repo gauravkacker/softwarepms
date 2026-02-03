@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ensureModule2DataSeeded();
     
     // DEBUG: Log what we're trying to find
-    const allRoles = (db as unknown as { getAll: (c: string) => unknown[] }).getAll('roles');
+    const allRoles = roleDb.getAll();
     console.log('DEBUG initAuth - roles count:', allRoles.length);
     
     // Check if we should auto-login in 'none' mode
