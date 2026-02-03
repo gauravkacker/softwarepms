@@ -23,9 +23,11 @@ export default function NewPatientPage() {
 
   // Form state
   const [formData, setFormData] = useState({
+    salutation: "",
     firstName: "",
     lastName: "",
     dateOfBirth: "",
+    age: "",
     gender: "" as "" | "male" | "female" | "other",
     mobileNumber: "",
     alternateMobile: "",
@@ -71,6 +73,24 @@ export default function NewPatientPage() {
         ...prev,
         [name]: value,
       }));
+    }
+
+    // Auto-fill gender based on salutation
+    if (name === "salutation") {
+      const genderMap: Record<string, "male" | "female" | "other"> = {
+        "Mr": "male",
+        "Mrs": "female",
+        "Ms": "female",
+        "Shri": "male",
+        "Master": "male",
+        "Baby": "other",
+        "Smt": "female",
+        "Kumari": "female",
+      };
+      const mappedGender = genderMap[value];
+      if (mappedGender) {
+        setFormData((prev) => ({ ...prev, gender: mappedGender }));
+      }
     }
 
     // Check for duplicates when name or mobile changes
@@ -122,18 +142,29 @@ export default function NewPatientPage() {
     setIsLoading(true);
 
     try {
+      // Validate: either DOB or Age must be provided
+      if (!formData.dateOfBirth && !formData.age) {
+        alert("Please provide either Date of Birth or Age");
+        setIsLoading(false);
+        return;
+      }
+
+      // Calculate age from DOB if provided, otherwise use the age field
+      let age = formData.age ? parseInt(formData.age) : 0;
+      if (formData.dateOfBirth) {
+        age = Math.floor(
+          (new Date().getTime() - new Date(formData.dateOfBirth).getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000)
+        );
+      }
+
       // Create patient object
       const patient = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
-        dateOfBirth: formData.dateOfBirth,
-        age: formData.dateOfBirth
-          ? Math.floor(
-              (new Date().getTime() - new Date(formData.dateOfBirth).getTime()) /
-                (365.25 * 24 * 60 * 60 * 1000)
-            )
-          : 0,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        age: age || undefined,
         gender: formData.gender,
         mobileNumber: formData.mobileNumber.trim(),
         alternateMobile: formData.alternateMobile.trim() || undefined,
@@ -248,29 +279,50 @@ export default function NewPatientPage() {
           <Card className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              {/* Name with Salutation */}
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  First Name <span className="text-red-500">*</span>
+                  Full Name <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  placeholder="Enter first name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  placeholder="Enter last name"
-                  required
-                />
+                <div className="flex">
+                  <select
+                    name="salutation"
+                    value={formData.salutation}
+                    onChange={handleInputChange}
+                    className="px-3 py-2 border border-r-0 border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-gray-700"
+                    style={{ minWidth: '80px' }}
+                  >
+                    <option value="">Select</option>
+                    <option value="Mr">Mr</option>
+                    <option value="Mrs">Mrs</option>
+                    <option value="Ms">Ms</option>
+                    <option value="Shri">Shri</option>
+                    <option value="Master">Master</option>
+                    <option value="Baby">Baby</option>
+                    <option value="Smt">Smt</option>
+                    <option value="Kumari">Kumari</option>
+                  </select>
+                  <div className="w-px bg-gray-300 mx-0"></div>
+                  <Input
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    placeholder="First name"
+                    className="rounded-none border-l-0"
+                    style={{ flex: 1 }}
+                    required
+                  />
+                  <div className="w-px bg-gray-300 mx-0"></div>
+                  <Input
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    placeholder="Last name"
+                    className="rounded-r-lg border-l-0"
+                    style={{ flex: 1 }}
+                    required
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -281,7 +333,20 @@ export default function NewPatientPage() {
                   name="dateOfBirth"
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
-                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Age <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  name="age"
+                  value={formData.age}
+                  onChange={handleInputChange}
+                  placeholder="Enter age in years"
+                  min="0"
+                  max="150"
                 />
               </div>
               <div>
@@ -570,7 +635,7 @@ export default function NewPatientPage() {
             <Button
               type="submit"
               variant="primary"
-              isLoading={isLoading}
+              loading={isLoading}
             >
               Create Patient
             </Button>
