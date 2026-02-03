@@ -129,7 +129,7 @@ export default function PatientProfilePage() {
                 <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                   <span>{patient.registrationNumber}</span>
                   <span>•</span>
-                  <span>{calculateAge(patient.dateOfBirth)} yrs</span>
+                  <span>{!isNaN(calculateAge(patient.dateOfBirth)) && calculateAge(patient.dateOfBirth) > 0 ? `${calculateAge(patient.dateOfBirth)} yrs` : 'Age not specified'}</span>
                   <span>•</span>
                   <span className="capitalize">{patient.gender}</span>
                   {patient.feeExempt && (
@@ -235,8 +235,8 @@ export default function PatientProfilePage() {
               <h2 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h2>
               <dl className="space-y-3">
                 <div>
-                  <dt className="text-sm text-gray-500">Date of Birth</dt>
-                  <dd className="text-gray-900">{formatDate(patient.dateOfBirth)}</dd>
+                  <dt className="text-sm text-gray-500">Age</dt>
+                  <dd className="text-gray-900">{!isNaN(patient.age) && patient.age > 0 ? `${patient.age} yrs` : 'Not specified'}</dd>
                 </div>
                 {patient.bloodGroup && (
                   <div>
