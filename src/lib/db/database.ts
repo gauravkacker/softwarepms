@@ -653,14 +653,13 @@ export const roleTemplateDb = {
 };
 
 // Ensure Module 2 data is seeded (called before auth operations)
-let module2Seeded = false;
+// Use a function-scoped variable to handle HMR resets
 export function ensureModule2DataSeeded(): void {
-  if (module2Seeded) return;
-  
   // Check if roles exist
   const roles = db.getAll('roles');
+  
+  // Always seed if no roles exist (handles HMR resets)
   if (roles.length === 0) {
     seedModule2Data();
-    module2Seeded = true;
   }
 }
