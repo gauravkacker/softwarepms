@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // DEBUG: Log what we're trying to find
     const allRoles = roleDb.getAll();
     console.log('DEBUG initAuth - roles count:', allRoles.length);
+    console.log('DEBUG initAuth - role IDs:', allRoles.map((r: unknown) => (r as { id: string }).id));
     
     // Check if we should auto-login in 'none' mode
     if (DEFAULT_LOGIN_MODE === 'none') {
