@@ -155,9 +155,6 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { user, hasPermission, isAuthenticated, logout, emergencyMode, frontdeskOverride } = useAuth();
 
-  // DEBUG: Log auth state
-  console.log('Sidebar - isAuthenticated:', isAuthenticated, 'user:', user?.name, 'has settings:', hasPermission('settings'));
-
   // Filter nav items based on permissions (Module 2.6)
   const filteredNavItems = navItems.filter((item) => {
     if (!item.requiredPermission) return true;

@@ -51,17 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Ensure Module 2 data is seeded
     ensureModule2DataSeeded();
     
-    // DEBUG: Log what we're trying to find
-    const allRoles = roleDb.getAll();
-    console.log('DEBUG initAuth - roles count:', allRoles.length);
-    console.log('DEBUG initAuth - role IDs:', allRoles.map((r: unknown) => (r as { id: string }).id));
-    
     // Check if we should auto-login in 'none' mode
     if (DEFAULT_LOGIN_MODE === 'none') {
       const doctorRole = roleDb.getById('role-doctor') as Role;
       const doctorUser = userDb.getById('user-doctor') as User;
-      
-      console.log('DEBUG initAuth - doctorRole:', !!doctorRole, 'doctorUser:', !!doctorUser);
       
       if (doctorRole && doctorUser) {
         return {

@@ -104,9 +104,11 @@ class LocalDatabase {
 
   public create<T extends Record<string, unknown>>(collection: string, item: T): T & { id: string; createdAt: Date; updatedAt: Date } {
     const items = this.getAll<T>(collection);
+    // Preserve existing ID if present, otherwise generate new one
+    const existingId = item.id;
     const newItem = {
       ...item,
-      id: this.generateId(),
+      id: existingId || this.generateId(),
       createdAt: new Date(),
       updatedAt: new Date(),
     } as T & { id: string; createdAt: Date; updatedAt: Date };
