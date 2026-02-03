@@ -3,21 +3,205 @@
 // Based on Module 1 Architecture Specification
 // ============================================
 
-// Clinical Domain Types
-export interface Patient {
+// ============================================
+// Clinical Domain Types - Updated for Module 3
+// ============================================
+
+// Patient Tag
+export interface PatientTag {
   id: string;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  gender: 'male' | 'female' | 'other';
-  contactPhone: string;
-  contactEmail?: string;
-  address?: Address;
-  emergencyContact?: EmergencyContact;
-  medicalHistory?: string[];
-  allergies?: string[];
+  name: string;
+  color: string; // e.g., '#ef4444' for red badge
+  description?: string;
+  isSystem: boolean; // System tags cannot be deleted
+}
+
+// Visit Mode
+export type VisitMode = 'in-person' | 'video' | 'self-repeat';
+
+// Visit Status
+export type VisitStatus = 'completed' | 'cancelled' | 'no-show';
+
+// Visit / Case Record
+export interface Visit {
+  id: string;
+  patientId: string;
+  registrationNumber: string;
+  caseId?: string; // Linked case if any
+  visitNumber: number; // Sequential visit count for patient
+  visitDate: Date;
+  visitTime: string; // HH:mm format
+  doctorId: string;
+  doctorName: string;
+  mode: VisitMode;
+  status: VisitStatus;
+  chiefComplaint?: string;
+  diagnosis?: string;
+  prescriptionId?: string;
+  feeId?: string;
+  notes?: string;
+  isSelfRepeat: boolean; // If patient came only for medicines
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Investigation / Lab Report
+export interface Investigation {
+  id: string;
+  patientId: string;
+  visitId?: string;
+  fileName: string;
+  fileType: 'pdf' | 'jpg' | 'jpeg' | 'png' | 'webp';
+  fileSize: number; // bytes
+  fileUrl: string; // Blob URL or path
+  title: string;
+  description?: string;
+  investigationDate: Date;
+  uploadedBy: string;
+  uploadedAt: Date;
+}
+
+// Voice Note
+export interface VoiceNote {
+  id: string;
+  patientId: string;
+  visitId?: string;
+  fileName: string;
+  fileUrl: string;
+  duration: number; // seconds
+  transcript?: string;
+  language: string;
+  recordedBy: string; // Patient or staff
+  createdAt: Date;
+}
+
+// Fee Exemption
+export interface FeeExemption {
+  id: string;
+  patientId: string;
+  reason: string;
+  exemptedBy: string;
+  exemptedAt: Date;
+  isActive: boolean;
+}
+
+// Prescription History Entry
+export interface PrescriptionHistory {
+  id: string;
+  patientId: string;
+  visitId: string;
+  prescriptionId: string;
+  prescriptionDate: Date;
+  doctorId: string;
+  doctorName: string;
+  medicines: string[];
+  diagnosis?: string;
+  notes?: string;
+}
+
+// Fee History Entry
+export interface FeeHistoryEntry {
+  id: string;
+  patientId: string;
+  visitId?: string;
+  receiptId: string;
+  feeType: 'first-visit' | 'follow-up' | 'exempt' | 'consultation' | 'medicine';
+  amount: number;
+  paymentMethod: 'cash' | 'card' | 'upi' | 'cheque' | 'insurance' | 'exempt';
+  paymentStatus: 'paid' | 'pending' | 'partial' | 'refunded';
+  paidDate: Date;
+  daysSinceLastFee?: number;
+}
+
+// Patient Type - Module 3 Complete
+export interface Patient {
+  // Core Identity
+  id: string;
+  registrationNumber: string; // Unique, auto-generated, never reused
+  
+  // Name Fields
+  firstName: string;
+  lastName: string;
+  fullName: string; // Computed: firstName + lastName
+  
+  // Demographics
+  dateOfBirth: string; // ISO date string (YYYY-MM-DD)
+  age: number; // Computed from DOB
+  gender: 'male' | 'female' | 'other';
+  
+  // Contact Details
+  mobileNumber: string; // Primary contact
+  alternateMobile?: string;
+  email?: string;
+  
+  // Address
+  address?: {
+    street: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country: string;
+  };
+  
+  // Additional Info
+  bloodGroup?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'unknown';
+  occupation?: string;
+  maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
+  religion?: string;
+  referredBy?: string; // Referral source
+  
+  // Profile Photo
+  photoUrl?: string; // Blob URL or path
+  photoThumbnail?: string;
+  
+  // Tags
+  tags: string[]; // Array of tag IDs
+  
+  // Fee Exemption
+  feeExempt: boolean;
+  feeExemptionReason?: string;
+  
+  // Privacy Controls
+  privacySettings: {
+    hideMentalSymptoms: boolean; // From Frontdesk
+    hideDiagnosis: boolean;
+    hidePrognosis: boolean;
+    hideFees: boolean; // From Pharmacy
+    hideCaseNotes: boolean;
+  };
+  
+  // Medical Info
+  medicalHistory?: string[];
+  allergies?: string[];
+  
+  // Metadata
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  
+  // Statistics (computed on demand)
+  totalVisits?: number;
+  lastVisitDate?: Date;
+  lastFeeAmount?: number;
+  lastFeeDate?: Date;
+}
+
+// Registration Number Settings
+export interface RegNumberSettings {
+  prefix: string; // e.g., 'DK-'
+  startingNumber: number; // e.g., 1001
+  padding: number; // e.g., 4 for 0001
+  separator: string; // e.g., '-' or '/'
+}
+
+// Duplicate Patient Warning
+export interface DuplicateWarning {
+  patientId: string;
+  matchedPatientId: string;
+  matchedPatientName: string;
+  matchedMobile: string;
+  matchScore: number; // 0-100
+  matchReasons: string[]; // ['Mobile number matches', 'Name similarity: 85%']
 }
 
 export interface Address {
@@ -211,6 +395,15 @@ export interface AppSettings {
   doctorName: string;
   doctorRegistrationNumber?: string;
   modules: ModuleConfig[];
+  
+  // Module 3: Registration Number Settings
+  registrationNumber: {
+    prefix: string;
+    startingNumber: number;
+    padding: number;
+    separator: string;
+  };
+  
   generalSettings: {
     dateFormat: string;
     timeFormat: string;
@@ -362,7 +555,7 @@ export interface AuthState {
 }
 
 // ============================================
-// Module 2 END
+// Module 3 END - Patient Master Database
 // ============================================
 
 // Utility Types

@@ -1,0 +1,582 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
+import { patientDb, patientTagDb } from "@/lib/db/database";
+import type { PatientTag } from "@/types";
+
+export default function NewPatientPage() {
+  const router = useRouter();
+  const [tags, setTags] = useState<PatientTag[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicatePatients, setDuplicatePatients] = useState<Array<{
+    id: string;
+    registrationNumber: string;
+    fullName: string;
+    mobileNumber: string;
+  }>>([]);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    dateOfBirth: "",
+    gender: "" as "" | "male" | "female" | "other",
+    mobileNumber: "",
+    alternateMobile: "",
+    email: "",
+    bloodGroup: "" as "" | "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-" | "unknown",
+    occupation: "",
+    maritalStatus: "" as "" | "single" | "married" | "divorced" | "widowed",
+    religion: "",
+    referredBy: "",
+    addressStreet: "",
+    addressCity: "",
+    addressState: "",
+    addressPincode: "",
+    addressCountry: "India",
+    medicalHistory: "",
+    allergies: "",
+    feeExempt: false,
+    feeExemptionReason: "",
+    selectedTags: [] as string[],
+  });
+
+  useEffect(() => {
+    loadTags();
+  }, []);
+
+  const loadTags = () => {
+    const allTags = patientTagDb.getAll() as PatientTag[];
+    setTags(allTags);
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value, type } = e.target;
+    
+    if (type === "checkbox") {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: (e.target as HTMLInputElement).checked,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+
+    // Check for duplicates when name or mobile changes
+    if (name === "firstName" || name === "lastName" || name === "mobileNumber") {
+      checkForDuplicates();
+    }
+  };
+
+  const checkForDuplicates = () => {
+    const name = `${formData.firstName} ${formData.lastName}`.trim();
+    const mobile = formData.mobileNumber.trim();
+    
+    if (!name && !mobile) {
+      setShowDuplicateWarning(false);
+      setDuplicatePatients([]);
+      return;
+    }
+
+    const duplicates = patientDb.findDuplicates(name, mobile);
+    if (duplicates.length > 0) {
+      const duplicateData = duplicates.map((id) => {
+        const patient = patientDb.getById(id);
+        return {
+          id,
+          registrationNumber: (patient as { registrationNumber: string })?.registrationNumber || "",
+          fullName: (patient as { fullName: string })?.fullName || "",
+          mobileNumber: (patient as { mobileNumber: string })?.mobileNumber || "",
+        };
+      });
+      setDuplicatePatients(duplicateData);
+      setShowDuplicateWarning(true);
+    } else {
+      setShowDuplicateWarning(false);
+      setDuplicatePatients([]);
+    }
+  };
+
+  const handleTagToggle = (tagId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedTags: prev.selectedTags.includes(tagId)
+        ? prev.selectedTags.filter((id) => id !== tagId)
+        : [...prev.selectedTags, tagId],
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // Create patient object
+      const patient = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+        dateOfBirth: formData.dateOfBirth,
+        age: formData.dateOfBirth
+          ? Math.floor(
+              (new Date().getTime() - new Date(formData.dateOfBirth).getTime()) /
+                (365.25 * 24 * 60 * 60 * 1000)
+            )
+          : 0,
+        gender: formData.gender,
+        mobileNumber: formData.mobileNumber.trim(),
+        alternateMobile: formData.alternateMobile.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        bloodGroup: formData.bloodGroup || undefined,
+        occupation: formData.occupation.trim() || undefined,
+        maritalStatus: formData.maritalStatus || undefined,
+        religion: formData.religion.trim() || undefined,
+        referredBy: formData.referredBy.trim() || undefined,
+        address: formData.addressStreet
+          ? {
+              street: formData.addressStreet.trim(),
+              city: formData.addressCity.trim(),
+              state: formData.addressState.trim(),
+              pincode: formData.addressPincode.trim(),
+              country: formData.addressCountry,
+            }
+          : undefined,
+        tags: formData.selectedTags,
+        feeExempt: formData.feeExempt,
+        feeExemptionReason: formData.feeExempt ? formData.feeExemptionReason : undefined,
+        privacySettings: {
+          hideMentalSymptoms: false,
+          hideDiagnosis: false,
+          hidePrognosis: false,
+          hideFees: false,
+          hideCaseNotes: false,
+        },
+        medicalHistory: formData.medicalHistory
+          ? formData.medicalHistory.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        allergies: formData.allergies
+          ? formData.allergies.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        createdBy: "current-user",
+      };
+
+      const newPatient = patientDb.create(patient);
+      router.push(`/patients/${newPatient.id}`);
+    } catch (error) {
+      console.error("Error creating patient:", error);
+      alert("Failed to create patient. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">New Patient</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Register a new patient in the system
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="p-6 max-w-4xl mx-auto">
+        {/* Duplicate Warning */}
+        {showDuplicateWarning && (
+          <Card className="mb-6 p-4 border-amber-200 bg-amber-50">
+            <div className="flex items-start gap-3">
+              <svg className="h-5 w-5 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-amber-800">
+                  Possible Duplicate Patient Found
+                </h3>
+                <div className="mt-2 space-y-2">
+                  {duplicatePatients.map((patient) => (
+                    <div
+                      key={patient.id}
+                      className="text-sm text-amber-700 flex items-center justify-between"
+                    >
+                      <span>
+                        {patient.fullName} ({patient.registrationNumber}) - {patient.mobileNumber}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/patients/${patient.id}`)}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-amber-600">
+                  This patient may already exist. Please verify before creating a new record.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        <div className="space-y-6">
+          {/* Basic Information */}
+          <Card className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  placeholder="Enter first name"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  placeholder="Enter last name"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date of Birth <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mobile Number <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="tel"
+                  name="mobileNumber"
+                  value={formData.mobileNumber}
+                  onChange={handleInputChange}
+                  placeholder="+91-XXXXXXXXXX"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Alternate Mobile
+                </label>
+                <Input
+                  type="tel"
+                  name="alternateMobile"
+                  value={formData.alternateMobile}
+                  onChange={handleInputChange}
+                  placeholder="+91-XXXXXXXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Blood Group
+                </label>
+                <select
+                  name="bloodGroup"
+                  value={formData.bloodGroup}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select blood group</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Additional Information */}
+          <Card className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Occupation
+                </label>
+                <Input
+                  name="occupation"
+                  value={formData.occupation}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Engineer, Teacher"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Marital Status
+                </label>
+                <select
+                  name="maritalStatus"
+                  value={formData.maritalStatus}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select status</option>
+                  <option value="single">Single</option>
+                  <option value="married">Married</option>
+                  <option value="divorced">Divorced</option>
+                  <option value="widowed">Widowed</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Religion
+                </label>
+                <Input
+                  name="religion"
+                  value={formData.religion}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Hindu, Muslim, Christian"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Referred By
+                </label>
+                <Input
+                  name="referredBy"
+                  value={formData.referredBy}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Dr. Smith, Friend"
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Address */}
+          <Card className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Address</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Street Address
+                </label>
+                <Input
+                  name="addressStreet"
+                  value={formData.addressStreet}
+                  onChange={handleInputChange}
+                  placeholder="House No, Street Name"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <Input
+                    name="addressCity"
+                    value={formData.addressCity}
+                    onChange={handleInputChange}
+                    placeholder="City"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                  <Input
+                    name="addressState"
+                    value={formData.addressState}
+                    onChange={handleInputChange}
+                    placeholder="State"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PIN Code</label>
+                  <Input
+                    name="addressPincode"
+                    value={formData.addressPincode}
+                    onChange={handleInputChange}
+                    placeholder="6-digit PIN"
+                  />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Medical Information */}
+          <Card className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Medical Information</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Medical History
+                </label>
+                <textarea
+                  name="medicalHistory"
+                  value={formData.medicalHistory}
+                  onChange={handleInputChange}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Diabetes, Hypertension (comma-separated)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Allergies
+                </label>
+                <textarea
+                  name="allergies"
+                  value={formData.allergies}
+                  onChange={handleInputChange}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Penicillin, Aspirin (comma-separated)"
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Tags */}
+          <Card className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Patient Tags</h2>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => handleTagToggle(tag.id)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    formData.selectedTags.includes(tag.id)
+                      ? "text-white"
+                      : "text-gray-700 bg-gray-100 hover:bg-gray-200"
+                  }`}
+                  style={{
+                    backgroundColor: formData.selectedTags.includes(tag.id)
+                      ? tag.color
+                      : undefined,
+                  }}
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* Fee Exemption */}
+          <Card className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Fee Settings</h2>
+            <div className="space-y-4">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="feeExempt"
+                  checked={formData.feeExempt}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-gray-700">Exempt from fees</span>
+              </label>
+              {formData.feeExempt && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Exemption Reason
+                  </label>
+                  <textarea
+                    name="feeExemptionReason"
+                    value={formData.feeExemptionReason}
+                    onChange={handleInputChange}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Reason for fee exemption"
+                  />
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Submit */}
+          <div className="flex justify-end gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isLoading}
+            >
+              Create Patient
+            </Button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}

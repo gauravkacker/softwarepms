@@ -13,7 +13,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { useAuth } from '@/lib/auth/auth-context';
-import { db, seedModule2Data } from '@/lib/db/database';
+import { db, seedModule2Data, seedInitialData } from '@/lib/db/database';
 import type { Patient, Appointment, QueueItem, MateriaMedica } from '@/types';
 
 export default function Dashboard() {
@@ -26,7 +26,7 @@ export default function Dashboard() {
     const hasSeededModule2 = localStorage.getItem('pms_module2_seeded');
     
     if (!hasSeeded) {
-      db.seedInitialData();
+      seedInitialData();
       localStorage.setItem('pms_seeded', 'true');
     }
     
@@ -313,7 +313,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{patient.contactPhone}</td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{patient.mobileNumber}</td>
                       <td className="py-3 px-4 text-sm text-gray-600">{patient.dateOfBirth}</td>
                       <td className="py-3 px-4">
                         <div className="flex gap-1 flex-wrap">
