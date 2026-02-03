@@ -12,7 +12,7 @@ import type { PatientTag } from "@/types";
 export default function NewPatientPage() {
   const router = useRouter();
   const [tags, setTags] = useState<PatientTag[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicatePatients, setDuplicatePatients] = useState<Array<{
     id: string;
@@ -49,14 +49,8 @@ export default function NewPatientPage() {
     selectedTags: [] as string[],
   });
 
-  // Generate registration number on mount
-  const [registrationNumber, setRegistrationNumber] = useState("");
-
   useEffect(() => {
     loadTags();
-    // Generate registration number
-    const regNumber = patientDb.generateRegNumber();
-    setRegistrationNumber(regNumber);
   }, []);
 
   const loadTags = () => {
@@ -145,13 +139,13 @@ export default function NewPatientPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
 
     try {
       // Validate: either DOB or Age must be provided
       if (!formData.dateOfBirth && !formData.age) {
         alert("Please provide either Date of Birth or Age");
-        setIsLoading(false);
+        setLoading(false);
         return;
       }
 
@@ -164,9 +158,8 @@ export default function NewPatientPage() {
         );
       }
 
-      // Create patient object
+      // Create patient object (registration number is auto-generated in patientDb.create)
       const patient = {
-        registrationNumber,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
@@ -215,7 +208,7 @@ export default function NewPatientPage() {
       console.error("Error creating patient:", error);
       alert("Failed to create patient. Please try again.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -264,7 +257,7 @@ export default function NewPatientPage() {
                       </span>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => router.push(`/patients/${patient.id}`)}
                       >
@@ -286,10 +279,10 @@ export default function NewPatientPage() {
           <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
             <div>
               <span className="text-sm font-medium text-blue-700">Registration Number</span>
-              <p className="text-xs text-blue-500 mt-0.5">Auto-generated unique identifier</p>
+              <p className="text-xs text-blue-500 mt-0.5">Auto-generated on save</p>
             </div>
             <div className="text-right">
-              <span className="text-lg font-semibold text-blue-800 font-mono">{registrationNumber}</span>
+              <span className="text-lg font-semibold text-blue-800 font-mono">Pending...</span>
             </div>
           </div>
 
@@ -506,8 +499,8 @@ export default function NewPatientPage() {
           {/* Address */}
           <Card className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Address</h2>
-            <div className="space-y-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Street Address
                 </label>
@@ -515,37 +508,52 @@ export default function NewPatientPage() {
                   name="addressStreet"
                   value={formData.addressStreet}
                   onChange={handleInputChange}
-                  placeholder="House No, Street Name"
+                  placeholder="House/Flat number, Street name"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <Input
-                    name="addressCity"
-                    value={formData.addressCity}
-                    onChange={handleInputChange}
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                  <Input
-                    name="addressState"
-                    value={formData.addressState}
-                    onChange={handleInputChange}
-                    placeholder="State"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PIN Code</label>
-                  <Input
-                    name="addressPincode"
-                    value={formData.addressPincode}
-                    onChange={handleInputChange}
-                    placeholder="6-digit PIN"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  City
+                </label>
+                <Input
+                  name="addressCity"
+                  value={formData.addressCity}
+                  onChange={handleInputChange}
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  State
+                </label>
+                <Input
+                  name="addressState"
+                  value={formData.addressState}
+                  onChange={handleInputChange}
+                  placeholder="State"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  PIN Code
+                </label>
+                <Input
+                  name="addressPincode"
+                  value={formData.addressPincode}
+                  onChange={handleInputChange}
+                  placeholder="PIN Code"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Country
+                </label>
+                <Input
+                  name="addressCountry"
+                  value={formData.addressCountry}
+                  onChange={handleInputChange}
+                  placeholder="Country"
+                />
               </div>
             </div>
           </Card>
@@ -553,99 +561,93 @@ export default function NewPatientPage() {
           {/* Medical Information */}
           <Card className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Medical Information</h2>
-            <div className="space-y-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Medical History
                 </label>
                 <textarea
                   name="medicalHistory"
                   value={formData.medicalHistory}
-                  onChange={handleInputChange}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., Diabetes, Hypertension (comma-separated)"
+                  onChange={(e) => handleInputChange(e as React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>)}
+                  placeholder="Previous illnesses, surgeries, chronic conditions (comma-separated)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px] resize-y"
                 />
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Allergies
                 </label>
                 <textarea
                   name="allergies"
                   value={formData.allergies}
-                  onChange={handleInputChange}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., Penicillin, Aspirin (comma-separated)"
+                  onChange={(e) => handleInputChange(e as React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>)}
+                  placeholder="Known allergies to medicines, foods, or other substances (comma-separated)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[80px] resize-y"
                 />
               </div>
             </div>
           </Card>
 
-          {/* Tags */}
-          <Card className="p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Patient Tags</h2>
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => handleTagToggle(tag.id)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    formData.selectedTags.includes(tag.id)
-                      ? "text-white"
-                      : "text-gray-700 bg-gray-100 hover:bg-gray-200"
-                  }`}
-                  style={{
-                    backgroundColor: formData.selectedTags.includes(tag.id)
-                      ? tag.color
-                      : undefined,
-                  }}
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-          </Card>
+          {/* Patient Tags */}
+          {tags.length > 0 && (
+            <Card className="p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Patient Tags</h2>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleTagToggle(tag.id)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      formData.selectedTags.includes(tag.id)
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                        : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Fee Exemption */}
           <Card className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Fee Settings</h2>
-            <div className="space-y-4">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  name="feeExempt"
-                  checked={formData.feeExempt}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-gray-700">Exempt from fees</span>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                name="feeExempt"
+                id="feeExempt"
+                checked={formData.feeExempt}
+                onChange={(e) => handleInputChange(e as React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="feeExempt" className="text-sm font-medium text-gray-700">
+                Exempt from consultation fees
               </label>
-              {formData.feeExempt && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Exemption Reason
-                  </label>
-                  <textarea
-                    name="feeExemptionReason"
-                    value={formData.feeExemptionReason}
-                    onChange={handleInputChange}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Reason for fee exemption"
-                  />
-                </div>
-              )}
             </div>
+            {formData.feeExempt && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fee Exemption Reason
+                </label>
+                <Input
+                  name="feeExemptionReason"
+                  value={formData.feeExemptionReason}
+                  onChange={handleInputChange}
+                  placeholder="Reason for fee exemption"
+                />
+              </div>
+            )}
           </Card>
 
-          {/* Submit */}
-          <div className="flex justify-end gap-4">
+          {/* Submit Button */}
+          <div className="flex justify-end gap-3">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => router.back()}
             >
               Cancel
@@ -653,9 +655,9 @@ export default function NewPatientPage() {
             <Button
               type="submit"
               variant="primary"
-              loading={isLoading}
+              loading={loading}
             >
-              Create Patient
+              Register Patient
             </Button>
           </div>
         </div>

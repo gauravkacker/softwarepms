@@ -190,10 +190,10 @@ class LocalDatabase {
   // Module 3: Registration Number Generation
   private regNumberCounter: number = 1000;
   private regNumberSettings: RegNumberSettings = {
-    prefix: 'DK-',
+    prefix: '',
     startingNumber: 1001,
     padding: 4,
-    separator: '-',
+    separator: '',
   };
 
   public initRegNumberSettings(settings: RegNumberSettings): void {
@@ -204,7 +204,7 @@ class LocalDatabase {
   public generateRegNumber(): string {
     const number = this.regNumberCounter++;
     const paddedNumber = number.toString().padStart(this.regNumberSettings.padding, '0');
-    return `${this.regNumberSettings.prefix}${this.regNumberSettings.separator}${paddedNumber}`;
+    return `${this.regNumberSettings.prefix}${paddedNumber}`;
   }
 
   public getRegNumberSettings(): RegNumberSettings {
