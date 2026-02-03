@@ -10,8 +10,11 @@ import type { DatabaseConfig } from '@/types';
 const dbConfig: DatabaseConfig = {
   type: 'sqlite',
   name: 'pms_database',
-  version: 2, // Incremented for Module 2
+  version: 3, // Incremented to trigger reset after Module 2 fixes
 };
+
+// Database schema version - increment to reset data after schema changes
+const SCHEMA_VERSION = '2026-02-03-1';
 
 // In-memory storage for demo (will be replaced with SQLite in production)
 class LocalDatabase {
@@ -24,10 +27,27 @@ class LocalDatabase {
   }
 
   public static getInstance(): LocalDatabase {
+    // Check if we need to reset for schema changes
+    if (LocalDatabase.shouldReset()) {
+      LocalDatabase.instance = undefined as unknown as LocalDatabase;
+    }
+    
     if (!LocalDatabase.instance) {
       LocalDatabase.instance = new LocalDatabase();
     }
     return LocalDatabase.instance;
+  }
+
+  private static shouldReset(): boolean {
+    // Check if stored schema version matches current
+    if (typeof window !== 'undefined') {
+      const storedVersion = localStorage.getItem('pms_schema_version');
+      if (storedVersion !== SCHEMA_VERSION) {
+        localStorage.setItem('pms_schema_version', SCHEMA_VERSION);
+        return true;
+      }
+    }
+    return false;
   }
 
   private initializeStores(): void {
