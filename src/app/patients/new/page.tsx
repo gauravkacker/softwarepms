@@ -49,8 +49,14 @@ export default function NewPatientPage() {
     selectedTags: [] as string[],
   });
 
+  // Generate registration number on mount
+  const [registrationNumber, setRegistrationNumber] = useState("");
+
   useEffect(() => {
     loadTags();
+    // Generate registration number
+    const regNumber = patientDb.generateRegNumber();
+    setRegistrationNumber(regNumber);
   }, []);
 
   const loadTags = () => {
@@ -160,6 +166,7 @@ export default function NewPatientPage() {
 
       // Create patient object
       const patient = {
+        registrationNumber,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
@@ -275,6 +282,17 @@ export default function NewPatientPage() {
         )}
 
         <div className="space-y-6">
+          {/* Registration Number (Auto-generated) */}
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-blue-700">Registration Number</span>
+              <p className="text-xs text-blue-500 mt-0.5">Auto-generated unique identifier</p>
+            </div>
+            <div className="text-right">
+              <span className="text-lg font-semibold text-blue-800 font-mono">{registrationNumber}</span>
+            </div>
+          </div>
+
           {/* Basic Information */}
           <Card className="p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
