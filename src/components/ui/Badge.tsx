@@ -9,6 +9,7 @@ interface BadgeProps {
   variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'outline' | 'destructive';
   size?: 'sm' | 'md';
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function Badge({
@@ -16,6 +17,7 @@ export function Badge({
   variant = 'default',
   size = 'md',
   className = '',
+  style,
 }: BadgeProps) {
   const variantStyles = {
     default: 'bg-gray-100 text-gray-700',
@@ -40,6 +42,7 @@ export function Badge({
         ${sizeStyles[size]}
         ${className}
       `}
+      style={style}
     >
       {children}
     </span>
