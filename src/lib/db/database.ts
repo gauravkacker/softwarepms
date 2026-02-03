@@ -510,6 +510,7 @@ export const patientDb = {
       return patient.registrationNumber === regNumber;
     });
   },
+  generateRegNumber: () => db.generateRegNumber(),
   create: (patient: Parameters<typeof db.create>[1]) => {
     const regNumber = db.generateRegNumber();
     return db.create('patients', { ...patient, registrationNumber: regNumber });
