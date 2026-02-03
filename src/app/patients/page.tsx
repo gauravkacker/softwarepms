@@ -171,9 +171,9 @@ export default function PatientsPage() {
               const lastFee = getLastFeeInfo(patient.id);
               
               return (
-                <div
+                <Card
                   key={patient.id}
-                  className="p-4 hover:shadow-md transition-shadow cursor-pointer bg-white rounded-lg border border-gray-200"
+                  className="p-4 hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => handlePatientClick(patient.id)}
                 >
                   <div className="flex items-start gap-4">
