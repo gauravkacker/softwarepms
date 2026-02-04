@@ -654,14 +654,6 @@ export const prescriptionHistoryDb = {
   create: (entry: Parameters<typeof db.create>[1]) => db.create('prescriptionHistory', entry),
 };
 
-export const appointmentDb = {
-  getAll: () => db.getAll('appointments'),
-  getById: (id: string) => db.getById('appointments', id),
-  create: (appointment: Parameters<typeof db.create>[1]) => db.create('appointments', appointment),
-  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('appointments', id, updates),
-  delete: (id: string) => db.delete('appointments', id),
-};
-
 export const materiaMedicaDb = {
   getAll: () => db.getAll('materiaMedica'),
   getById: (id: string) => db.getById('materiaMedica', id),
@@ -673,13 +665,6 @@ export const feesDb = {
   getAll: () => db.getAll('fees'),
   getById: (id: string) => db.getById('fees', id),
   create: (fee: Parameters<typeof db.create>[1]) => db.create('fees', fee),
-};
-
-export const queueDb = {
-  getAll: () => db.getAll('queue'),
-  add: (item: Parameters<typeof db.create>[1]) => db.create('queue', item),
-  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('queue', id, updates),
-  remove: (id: string) => db.delete('queue', id),
 };
 
 // ============================================
@@ -908,6 +893,283 @@ export const settingsDb = {
       db.update('settings', id, data);
     } else {
       db.create('settings', { ...data, id });
+    }
+  },
+};
+
+// ============================================
+// Module 4: Appointment Scheduler Operations (Updated)
+// ============================================
+
+export const appointmentDb = {
+  getAll: () => db.getAll('appointments'),
+  getById: (id: string) => db.getById('appointments', id),
+  getByPatient: (patientId: string) => {
+    const appointments = db.getAll('appointments');
+    return appointments.filter((a: unknown) => {
+      const apt = a as { patientId: string };
+      return apt.patientId === patientId;
+    }).sort((a, b) => {
+      const aptA = a as { appointmentDate: Date; appointmentTime: string };
+      const aptB = b as { appointmentDate: Date; appointmentTime: string };
+      const dateA = new Date(`${aptA.appointmentDate}T${aptA.appointmentTime}`);
+      const dateB = new Date(`${aptB.appointmentDate}T${aptB.appointmentTime}`);
+      return dateB.getTime() - dateA.getTime();
+    });
+  },
+  getByDate: (date: Date) => {
+    const appointments = db.getAll('appointments');
+    const targetDate = date.toISOString().split('T')[0];
+    return appointments.filter((a: unknown) => {
+      const apt = a as { appointmentDate: Date };
+      return new Date(apt.appointmentDate).toISOString().split('T')[0] === targetDate;
+    }).sort((a, b) => {
+      const aptA = a as { appointmentTime: string };
+      const aptB = b as { appointmentTime: string };
+      return aptA.appointmentTime.localeCompare(aptB.appointmentTime);
+    });
+  },
+  getBySlot: (date: Date, slotId: string) => {
+    const appointments = db.getAll('appointments');
+    const targetDate = date.toISOString().split('T')[0];
+    return appointments.filter((a: unknown) => {
+      const apt = a as { appointmentDate: Date; slotId: string };
+      return new Date(apt.appointmentDate).toISOString().split('T')[0] === targetDate && apt.slotId === slotId;
+    }).sort((a, b) => {
+      const aptA = a as { tokenNumber: number };
+      const aptB = b as { tokenNumber: number };
+      return (aptA.tokenNumber || 0) - (aptB.tokenNumber || 0);
+    });
+  },
+  getUpcoming: () => {
+    const appointments = db.getAll('appointments');
+    const today = new Date().toISOString().split('T')[0];
+    return appointments.filter((a: unknown) => {
+      const apt = a as { appointmentDate: Date; appointmentTime: string; status: string };
+      const aptDateTime = new Date(`${apt.appointmentDate}T${apt.appointmentTime}`);
+      const now = new Date();
+      return aptDateTime >= now && ['scheduled', 'confirmed'].includes(apt.status) && new Date(apt.appointmentDate).toISOString().split('T')[0] >= today;
+    }).sort((a, b) => {
+      const aptA = a as { appointmentDate: Date; appointmentTime: string };
+      const aptB = b as { appointmentDate: Date; appointmentTime: string };
+      const dateA = new Date(`${aptA.appointmentDate}T${aptA.appointmentTime}`);
+      const dateB = new Date(`${aptB.appointmentDate}T${aptB.appointmentTime}`);
+      return dateA.getTime() - dateB.getTime();
+    });
+  },
+  create: (appointment: Parameters<typeof db.create>[1]) => db.create('appointments', appointment),
+  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('appointments', id, updates),
+  delete: (id: string) => db.delete('appointments', id),
+  cancel: (id: string, reason?: string) => db.update('appointments', id, { 
+    status: 'cancelled', 
+    cancelledAt: new Date(),
+    cancellationReason: reason 
+  }),
+  checkIn: (id: string) => db.update('appointments', id, { 
+    status: 'checked-in',
+    checkedInAt: new Date() 
+  }),
+  startConsultation: (id: string) => db.update('appointments', id, { 
+    status: 'in-progress',
+    consultationStartedAt: new Date() 
+  }),
+  complete: (id: string) => db.update('appointments', id, { 
+    status: 'completed',
+    consultationEndedAt: new Date() 
+  }),
+  markNoShow: (id: string) => db.update('appointments', id, { status: 'no-show' }),
+  assignToken: (id: string, tokenNumber: number, slotId: string, slotName: string) => db.update('appointments', id, {
+    tokenNumber,
+    slotId,
+    slotName,
+    tokenAssignedAt: new Date()
+  }),
+};
+
+// ============================================
+// Module 4: Slot Operations
+// ============================================
+
+export const slotDb = {
+  getAll: () => db.getAll('slots'),
+  getById: (id: string) => db.getById('slots', id),
+  getActive: () => {
+    const slots = db.getAll('slots');
+    return slots.filter((s: unknown) => {
+      const slot = s as { isActive: boolean };
+      return slot.isActive;
+    }).sort((a, b) => {
+      const slotA = a as { displayOrder: number };
+      const slotB = b as { displayOrder: number };
+      return (slotA.displayOrder || 0) - (slotB.displayOrder || 0);
+    });
+  },
+  create: (slot: Parameters<typeof db.create>[1]) => db.create('slots', slot),
+  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('slots', id, updates),
+  delete: (id: string) => db.delete('slots', id),
+  toggleActive: (id: string) => {
+    const slot = db.getById('slots', id);
+    if (slot) {
+      const s = slot as { isActive: boolean };
+      db.update('slots', id, { isActive: !s.isActive });
+    }
+  },
+};
+
+// ============================================
+// Module 4: Queue Configuration Operations
+// ============================================
+
+export const queueDb = {
+  getAll: () => db.getAll('queueConfigs'),
+  getById: (id: string) => db.getById('queueConfigs', id),
+  getByDateAndSlot: (date: Date, slotId: string) => {
+    const queues = db.getAll('queueConfigs');
+    const targetDate = date.toISOString().split('T')[0];
+    return queues.find((q: unknown) => {
+      const queue = q as { date: Date; slotId: string };
+      return new Date(queue.date).toISOString().split('T')[0] === targetDate && queue.slotId === slotId;
+    });
+  },
+  getOrCreate: (date: Date, slotId: string, slotName: string) => {
+    const existing = queueDb.getByDateAndSlot(date, slotId);
+    if (existing) return existing;
+    
+    // Create new queue config
+    return db.create('queueConfigs', {
+      date,
+      slotId,
+      slotName,
+      status: 'open',
+      currentToken: 0,
+      totalPatients: 0,
+      completedPatients: 0,
+      skippedPatients: 0,
+    });
+  },
+  create: (queue: Parameters<typeof db.create>[1]) => db.create('queueConfigs', queue),
+  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('queueConfigs', id, updates),
+  delete: (id: string) => db.delete('queueConfigs', id),
+  open: (id: string) => db.update('queueConfigs', id, { 
+    status: 'open',
+    openedAt: new Date()
+  }),
+  close: (id: string) => db.update('queueConfigs', id, { 
+    status: 'closed',
+    closedAt: new Date()
+  }),
+  pause: (id: string) => db.update('queueConfigs', id, { 
+    status: 'paused',
+    pausedAt: new Date()
+  }),
+  resume: (id: string) => db.update('queueConfigs', id, { 
+    status: 'open',
+    resumedAt: new Date()
+  }),
+  incrementToken: (id: string) => {
+    const queue = db.getById('queueConfigs', id);
+    if (queue) {
+      const q = queue as { currentToken: number };
+      db.update('queueConfigs', id, { currentToken: q.currentToken + 1 });
+    }
+  },
+  incrementCompleted: (id: string) => {
+    const queue = db.getById('queueConfigs', id);
+    if (queue) {
+      const q = queue as { completedPatients: number };
+      db.update('queueConfigs', id, { completedPatients: q.completedPatients + 1 });
+    }
+  },
+  incrementSkipped: (id: string) => {
+    const queue = db.getById('queueConfigs', id);
+    if (queue) {
+      const q = queue as { skippedPatients: number };
+      db.update('queueConfigs', id, { skippedPatients: q.skippedPatients + 1 });
+    }
+  },
+};
+
+// ============================================
+// Module 4: Queue Item Operations
+// ============================================
+
+export const queueItemDb = {
+  getAll: () => db.getAll('queueItems'),
+  getById: (id: string) => db.getById('queueItems', id),
+  getByQueueConfig: (queueConfigId: string) => {
+    const items = db.getAll('queueItems');
+    return items.filter((i: unknown) => {
+      const item = i as { queueConfigId: string };
+      return item.queueConfigId === queueConfigId;
+    }).sort((a, b) => {
+      const itemA = a as { priority: string; tokenNumber: number };
+      const itemB = b as { priority: string; tokenNumber: number };
+      // Priority patients first
+      const priorityOrder = { 'emergency': 0, 'vip': 1, 'doctor-priority': 2, 'normal': 3 };
+      const orderA = priorityOrder[itemA.priority as keyof typeof priorityOrder] || 3;
+      const orderB = priorityOrder[itemB.priority as keyof typeof priorityOrder] || 3;
+      if (orderA !== orderB) return orderA - orderB;
+      return (itemA.tokenNumber || 0) - (itemB.tokenNumber || 0);
+    });
+  },
+  getActiveByDate: (date: Date) => {
+    const items = db.getAll('queueItems');
+    const targetDate = date.toISOString().split('T')[0];
+    return items.filter((i: unknown) => {
+      const item = i as { checkInTime: Date; status: string };
+      return new Date(item.checkInTime).toISOString().split('T')[0] === targetDate && 
+             ['waiting', 'in-consultation'].includes(item.status);
+    });
+  },
+  create: (item: Parameters<typeof db.create>[1]) => db.create('queueItems', item),
+  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('queueItems', id, updates),
+  delete: (id: string) => db.delete('queueItems', id),
+  call: (id: string) => db.update('queueItems', id, { status: 'in-consultation', consultationStartTime: new Date() }),
+  complete: (id: string) => db.update('queueItems', id, { 
+    status: 'completed', 
+    consultationEndTime: new Date() 
+  }),
+  skip: (id: string) => db.update('queueItems', id, { status: 'skipped' }),
+  noShow: (id: string) => db.update('queueItems', id, { status: 'no-show' }),
+  changePriority: (id: string, priority: string) => db.update('queueItems', id, { priority }),
+};
+
+// ============================================
+// Module 4: Queue Event Operations (Audit Trail)
+// ============================================
+
+export const queueEventDb = {
+  getAll: () => db.getAll('queueEvents'),
+  getByQueue: (queueId: string) => {
+    const events = db.getAll('queueEvents');
+    return events.filter((e: unknown) => {
+      const event = e as { queueId: string };
+      return event.queueId === queueId;
+    }).sort((a, b) => {
+      const eventA = a as { timestamp: Date };
+      const eventB = b as { timestamp: Date };
+      return new Date(eventB.timestamp).getTime() - new Date(eventA.timestamp).getTime();
+    });
+  },
+  create: (event: Parameters<typeof db.create>[1]) => db.create('queueEvents', event),
+};
+
+// ============================================
+// Module 4: Token Settings Operations
+// ============================================
+
+export const tokenSettingsDb = {
+  get: () => {
+    const settings = db.getAll('tokenSettings');
+    return settings.length > 0 ? settings[0] : null;
+  },
+  save: (settings: Parameters<typeof db.create>[1]) => {
+    const existing = tokenSettingsDb.get();
+    if (existing) {
+      const s = existing as { id: string };
+      db.update('tokenSettings', s.id, settings);
+    } else {
+      db.create('tokenSettings', settings);
     }
   },
 };

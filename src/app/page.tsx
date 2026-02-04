@@ -165,7 +165,7 @@ export default function Dashboard() {
                     >
                       <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
                         <span className="text-sm font-medium text-indigo-600">
-                          {item.queueNumber}
+                          {(item as { tokenNumber?: number }).tokenNumber || '?'}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -221,7 +221,7 @@ export default function Dashboard() {
                           {appointment.patientName}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {new Date(appointment.dateTime).toLocaleTimeString()} - {appointment.type}
+                          {new Date((appointment as { appointmentDate: Date }).appointmentDate).toLocaleDateString()} - {(appointment as { type: string }).type}
                         </p>
                       </div>
                       <StatusBadge status={appointment.status} />

@@ -1,13 +1,8 @@
 // ============================================
-// Core Type Definitions for PMS
-// Based on Module 1 Architecture Specification
+// Module 4: Appointment Scheduler & Queue Management
 // ============================================
 
-// ============================================
-// Clinical Domain Types - Updated for Module 3
-// ============================================
-
-// Patient Tag
+// Patient Tag (Module 3)
 export interface PatientTag {
   id: string;
   name: string;
@@ -16,11 +11,32 @@ export interface PatientTag {
   isSystem: boolean; // System tags cannot be deleted
 }
 
-// Visit Mode
-export type VisitMode = 'in-person' | 'video' | 'self-repeat';
+// Visit Mode (Module 4 - Updated - kept old values for backward compatibility)
+export type VisitMode = 'in-person' | 'tele' | 'video' | 'self-repeat';
 
 // Visit Status
 export type VisitStatus = 'completed' | 'cancelled' | 'no-show';
+
+// Appointment Status
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'checked-in' | 'in-progress' | 'completed' | 'cancelled' | 'no-show';
+
+// Appointment Type
+export type AppointmentType = 'new' | 'follow-up' | 'consultation' | 'emergency';
+
+// Visit Type
+export type VisitType = 'first-visit' | 'repeat' | 'emergency';
+
+// Token Assignment Mode
+export type TokenAssignmentMode = 'at-booking' | 'at-checkin' | 'hybrid';
+
+// Queue Status
+export type QueueStatus = 'open' | 'closed' | 'paused';
+
+// Queue Item Status
+export type QueueItemStatus = 'waiting' | 'in-consultation' | 'completed' | 'skipped' | 'no-show';
+
+// Priority Level
+export type PriorityLevel = 'normal' | 'vip' | 'emergency' | 'doctor-priority';
 
 // Visit / Case Record
 export interface Visit {
@@ -253,32 +269,121 @@ export interface Diagnosis {
   type: 'primary' | 'secondary';
 }
 
-// Operational Domain Types
+// ============================================
+// Module 4: Appointment Scheduler & Queue Management
+// ============================================
+
+// Slot Configuration
+export interface Slot {
+  id: string;
+  name: string; // e.g., "Morning", "Evening"
+  startTime: string; // HH:mm format
+  endTime: string; // HH:mm format
+  tokenReset: boolean; // Whether token numbering resets for this slot
+  maxTokens: number; // Maximum tokens for this slot
+  isActive: boolean;
+  displayOrder: number;
+}
+
+// Token Assignment Settings
+export interface TokenSettings {
+  mode: TokenAssignmentMode;
+  defaultTokenPrefix?: string;
+  autoGenerate: boolean;
+}
+
+// Queue Configuration
+export interface QueueConfig {
+  id: string;
+  date: Date;
+  slotId?: string;
+  status: QueueStatus;
+  currentToken: number;
+  openedAt?: Date;
+  closedAt?: Date;
+  pausedAt?: Date;
+  resumedAt?: Date;
+  totalPatients: number;
+  completedPatients: number;
+  skippedPatients: number;
+}
+
+// Queue Event (for audit trail)
+export interface QueueEvent {
+  id: string;
+  queueId: string;
+  queueItemId?: string;
+  eventType: 'check-in' | 'call' | 'start-consultation' | 'complete' | 'skip' | 'no-show' | 'reorder' | 'priority-change' | 'queue-open' | 'queue-close' | 'queue-pause' | 'queue-resume';
+  eventData?: Record<string, unknown>;
+  timestamp: Date;
+}
+
+// Appointment (Module 4 - Updated)
 export interface Appointment {
   id: string;
   patientId: string;
   patientName: string;
   doctorId: string;
-  dateTime: Date;
+  appointmentDate: Date; // Date only (YYYY-MM-DD)
+  appointmentTime: string; // HH:mm format
+  visitMode: VisitMode;
+  slotId?: string; // Optional slot assignment
+  slotName?: string;
+  tokenNumber?: number; // Assigned token (if mode A or C)
+  tokenAssignedAt?: Date;
   duration: number; // in minutes
-  type: 'new' | 'follow-up' | 'consultation' | 'emergency';
-  status: 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'no-show';
+  type: AppointmentType;
+  status: AppointmentStatus;
+  priority: PriorityLevel;
+  feeStatus: 'pending' | 'paid' | 'exempt';
+  feeAmount?: number;
+  feeId?: string;
   notes?: string;
+  isWalkIn: boolean;
+  checkedInAt?: Date;
+  consultationStartedAt?: Date;
+  consultationEndedAt?: Date;
+  cancelledAt?: Date;
+  cancellationReason?: string;
   reminderSent: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
+// Queue Item (Module 4 - Updated)
 export interface QueueItem {
   id: string;
+  queueConfigId: string;
   patientId: string;
   patientName: string;
   appointmentId?: string;
-  queueNumber: number;
-  status: 'waiting' | 'in-consultation' | 'completed' | 'skipped';
+  slotId: string;
+  slotName: string;
+  tokenNumber: number;
+  status: QueueItemStatus;
+  priority: PriorityLevel;
   checkInTime: Date;
+  consultationStartTime?: Date;
+  consultationEndTime?: Date;
   estimatedWaitTime?: number;
-  priority: 'normal' | 'priority' | 'emergency';
+  actualWaitTime?: number;
   notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Queue Summary (for display)
+export interface QueueSummary {
+  date: Date;
+  slotId: string;
+  slotName: string;
+  status: QueueStatus;
+  currentToken: number;
+  totalInQueue: number;
+  waiting: number;
+  inConsultation: number;
+  completed: number;
+  skipped: number;
 }
 
 export interface PharmacyItem {
