@@ -3,6 +3,7 @@
 ## Current State
 
 **Project Status**: ✅ Module 3 Complete - Patient Management System
+**Next**: Module 4 - Appointment Scheduler
 
 Building a modular, offline-first Practice Management System for homeopathic clinics based on Module 1 & Module 2 architecture specifications.
 
@@ -35,11 +36,16 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 - [x] Frontdesk override feature
 - [x] Sidebar updates based on user permissions
 
-### Module 3 - Patient Management System
+### Module 3 - Patient Management System (Complete)
 - [x] Patient type definition and CRUD operations
 - [x] Patient list page with search and filtering
 - [x] Patient detail view page
 - [x] Add new patient form
+- [x] Edit patient page (/patients/[id]/edit)
+- [x] Delete patient functionality
+- [x] Create visit form (/patients/[id]/visits/new)
+- [x] Salutation field support
+- [x] Age display fix (use patient.age field)
 
 ## Architecture Overview (Module 1)
 
