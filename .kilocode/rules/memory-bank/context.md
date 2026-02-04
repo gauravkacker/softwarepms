@@ -46,6 +46,9 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 - [x] Create visit form (/patients/[id]/visits/new)
 - [x] Salutation field support
 - [x] Age display fix (use patient.age field)
+- [x] **Profile Photo Upload** - Webcam capture + file upload with compression (3.5)
+- [x] **Tag Management UI** - Create/edit/delete custom patient tags (3.6)
+- [x] **Registration Number Settings** - Configure prefix, starting number, padding (3.2)
 
 ## Architecture Overview (Module 1)
 
