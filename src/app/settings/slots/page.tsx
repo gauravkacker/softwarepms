@@ -14,11 +14,13 @@ export default function SlotSettingsPage() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingSlot, setEditingSlot] = useState<Slot | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     startTime: "09:00",
     endTime: "13:00",
     maxTokens: 20,
+    duration: 10,
     tokenReset: true,
     isActive: true,
     displayOrder: 0,
@@ -38,12 +40,14 @@ export default function SlotSettingsPage() {
   }, [loadSlots]);
 
   const handleCreate = () => {
+    setIsCreating(true);
     setEditingSlot(null);
     setFormData({
       name: "",
       startTime: "09:00",
       endTime: "13:00",
       maxTokens: 20,
+      duration: 10,
       tokenReset: true,
       isActive: true,
       displayOrder: slots.length,
@@ -57,6 +61,7 @@ export default function SlotSettingsPage() {
       startTime: slot.startTime,
       endTime: slot.endTime,
       maxTokens: slot.maxTokens,
+      duration: slot.duration || 10,
       tokenReset: slot.tokenReset,
       isActive: slot.isActive,
       displayOrder: slot.displayOrder || 0,
@@ -77,6 +82,7 @@ export default function SlotSettingsPage() {
         startTime: formData.startTime,
         endTime: formData.endTime,
         maxTokens: formData.maxTokens,
+        duration: formData.duration,
         tokenReset: formData.tokenReset,
         isActive: formData.isActive,
         displayOrder: formData.displayOrder,
@@ -84,6 +90,7 @@ export default function SlotSettingsPage() {
     }
 
     setEditingSlot(null);
+    setIsCreating(false);
     loadSlots();
   };
 
@@ -182,7 +189,7 @@ export default function SlotSettingsPage() {
             </div>
 
             {/* Add/Edit Form */}
-            {(editingSlot || slots.length === 0) && !isLoading && (
+            {(editingSlot || isCreating) && !isLoading && (
               <Card className="p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   {editingSlot ? "Edit Slot" : "Create New Slot"}
@@ -251,7 +258,10 @@ export default function SlotSettingsPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleSave}>{editingSlot ? "Update" : "Create"} Slot</Button>
-                  <Button variant="secondary" onClick={() => setEditingSlot(null)}>
+                  <Button variant="secondary" onClick={() => {
+                    setEditingSlot(null);
+                    setIsCreating(false);
+                  }}>
                     Cancel
                   </Button>
                 </div>
@@ -259,7 +269,7 @@ export default function SlotSettingsPage() {
             )}
 
             {/* Add Slot Button */}
-            {!editingSlot && slots.length > 0 && (
+            {!editingSlot && !isCreating && slots.length > 0 && (
               <Button onClick={handleCreate}>Add Another Slot</Button>
             )}
           </div>

@@ -291,6 +291,7 @@ export interface Slot {
   name: string; // e.g., "Morning", "Evening"
   startTime: string; // HH:mm format
   endTime: string; // HH:mm format
+  duration: number; // Default duration per patient in minutes
   tokenReset: boolean; // Whether token numbering resets for this slot
   maxTokens: number; // Maximum tokens for this slot
   isActive: boolean;
@@ -348,8 +349,13 @@ export interface Appointment {
   status: AppointmentStatus;
   priority: PriorityLevel;
   feeStatus: 'pending' | 'paid' | 'exempt';
+  feeType?: string;
   feeAmount?: number;
   feeId?: string;
+  advancePaid?: number;
+  paymentMode?: string;
+  feeExempt?: boolean;
+  feeExemptionReason?: string;
   notes?: string;
   isWalkIn: boolean;
   checkedInAt?: Date;

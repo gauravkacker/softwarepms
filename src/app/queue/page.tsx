@@ -306,13 +306,18 @@ export default function QueuePage() {
                           </Button>
                         )}
                         {qItem.status !== "completed" && qItem.status !== "skipped" && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleSkipPatient(qItem.id)}
-                          >
-                            Skip
-                          </Button>
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleSkipPatient(qItem.id)}
+                            >
+                              Skip
+                            </Button>
+                            <Link href={`/patients/${qItem.patientId}`}>
+                              <Button variant="secondary" size="sm">View</Button>
+                            </Link>
+                          </>
                         )}
                       </div>
                     </div>

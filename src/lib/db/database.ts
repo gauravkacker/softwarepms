@@ -15,7 +15,8 @@ const dbConfig: DatabaseConfig = {
 };
 
 // Database schema version - increment to reset data after schema changes
-const SCHEMA_VERSION = '2026-02-03-module3';
+// NOTE: Set to empty string to preserve data between sessions
+const SCHEMA_VERSION = '';
 
 // In-memory storage for demo (will be replaced with SQLite in production)
 class LocalDatabase {
@@ -28,27 +29,11 @@ class LocalDatabase {
   }
 
   public static getInstance(): LocalDatabase {
-    // Check if we need to reset for schema changes
-    if (LocalDatabase.shouldReset()) {
-      LocalDatabase.instance = undefined as unknown as LocalDatabase;
-    }
-    
+    // Always return existing instance to preserve data
     if (!LocalDatabase.instance) {
       LocalDatabase.instance = new LocalDatabase();
     }
     return LocalDatabase.instance;
-  }
-
-  private static shouldReset(): boolean {
-    // Check if stored schema version matches current
-    if (typeof window !== 'undefined') {
-      const storedVersion = localStorage.getItem('pms_schema_version');
-      if (storedVersion !== SCHEMA_VERSION) {
-        localStorage.setItem('pms_schema_version', SCHEMA_VERSION);
-        return true;
-      }
-    }
-    return false;
   }
 
   private initializeStores(): void {
@@ -486,6 +471,34 @@ export function seedInitialData(): void {
 
   fees.forEach((fee) => {
     db.create('fees', fee);
+  });
+
+  // Seed default slots (Module 4)
+  const defaultSlots = [
+    {
+      name: 'Morning',
+      startTime: '11:00',
+      endTime: '13:30',
+      duration: 10,
+      maxTokens: 15,
+      tokenReset: true,
+      isActive: true,
+      displayOrder: 0,
+    },
+    {
+      name: 'Evening',
+      startTime: '18:00',
+      endTime: '20:30',
+      duration: 10,
+      maxTokens: 15,
+      tokenReset: true,
+      isActive: true,
+      displayOrder: 1,
+    },
+  ];
+
+  defaultSlots.forEach((slot) => {
+    db.create('slots', slot);
   });
 }
 

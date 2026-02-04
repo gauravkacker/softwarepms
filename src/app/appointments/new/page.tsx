@@ -22,11 +22,12 @@ export default function NewAppointmentPage() {
     date: new Date().toISOString().split("T")[0],
     slotId: "",
     time: "09:00",
-    duration: 30,
+    duration: 10,
     type: "follow-up" as const,
     visitMode: "in-person" as const,
     priority: "normal" as const,
     notes: "",
+    tokenNumber: 0,
     // Fee handling
     feeTypeId: "",
     feeStatus: "pending" as const,
@@ -300,247 +301,282 @@ export default function NewAppointmentPage() {
               )}
             </Card>
 
-            {/* Appointment Details */}
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Appointment Details</h2>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <Input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    min={new Date().toISOString().split("T")[0]}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Slot</label>
-                  <select
-                    value={formData.slotId}
-                    onChange={(e) => setFormData({ ...formData, slotId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select slot</option>
-                    {slots.map((slot) => {
-                      const s = slot as Slot;
-                      return (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.startTime} - {s.endTime})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                  <Input
-                    type="time"
-                    value={formData.time}
-                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
-                  <select
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={15}>15 minutes</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>60 minutes</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as typeof formData.type })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="new">New Patient</option>
-                    <option value="follow-up">Follow-up</option>
-                    <option value="consultation">Consultation</option>
-                    <option value="emergency">Emergency</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Visit Mode</label>
-                  <select
-                    value={formData.visitMode}
-                    onChange={(e) => setFormData({ ...formData, visitMode: e.target.value as typeof formData.visitMode })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="in-person">In-Person</option>
-                    <option value="tele">Teleconsultation</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value as typeof formData.priority })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="vip">VIP</option>
-                    <option value="emergency">Emergency</option>
-                    <option value="doctor-priority">Doctor Priority</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Any additional notes..."
-                />
-              </div>
-            </Card>
-
-            {/* Fee Section */}
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Fee Payment</h2>
-              
-              {/* Fee Exemption Toggle */}
-              <div className="mb-6">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.feeExempt}
-                    onChange={(e) => setFormData({ ...formData, feeExempt: e.target.checked, advancePaid: 0, feeAmount: 0, feeTypeId: "" })}
-                    className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                  />
-                  <span className="font-medium text-gray-900">Exempt from Fee (Doctor Approval)</span>
-                </label>
-                <p className="text-sm text-gray-500 mt-1 ml-8">
-                  Check this if the doctor has approved fee exemption for this patient
-                </p>
-              </div>
-
-              {!formData.feeExempt && (
-                <>
-                  {/* Fee Type Selection */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fee Type</label>
-                    <select
-                      value={formData.feeTypeId}
-                      onChange={(e) => handleFeeTypeChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select fee type</option>
-                      {feeTypes.map((fee) => {
-                        const f = fee as FeeType;
-                        return (
-                          <option key={f.id} value={f.id}>
-                            {f.name} - ₹{f.amount}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Fee amount auto-fills based on appointment type. You can change it here.
-                    </p>
-                  </div>
-
-                  {/* Fee Amount */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (₹)</label>
-                    <Input
-                      type="number"
-                      value={formData.feeAmount}
-                      onChange={(e) => setFormData({ ...formData, feeAmount: parseInt(e.target.value) || 0 })}
-                      min={0}
-                      className="w-full"
-                      placeholder="Enter or select fee amount"
-                    />
-                  </div>
-
-                  {/* Advance Payment */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Advance Payment (₹)</label>
-                    <Input
-                      type="number"
-                      value={formData.advancePaid}
-                      onChange={(e) => {
-                        const advance = parseInt(e.target.value) || 0;
-                        setFormData({ ...formData, advancePaid: Math.min(advance, formData.feeAmount) });
-                      }}
-                      min={0}
-                      max={formData.feeAmount}
-                      className="w-full"
-                      placeholder="Enter advance amount"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Balance: ₹{(formData.feeAmount - formData.advancePaid).toFixed(0)} | 
-                      {formData.advancePaid >= formData.feeAmount ? (
-                        <span className="text-green-600 font-medium">Fully Paid</span>
-                      ) : formData.advancePaid > 0 ? (
-                        <span className="text-yellow-600 font-medium">Partial Payment</span>
-                      ) : (
-                        <span className="text-gray-500">Pay Later</span>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Payment Mode */}
-                  {formData.advancePaid > 0 && (
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode</label>
+            {/* Form Container with Side-by-Side Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column: Appointment Details */}
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Appointment Details</h2>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                      <Input
+                        type="date"
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        min={new Date().toISOString().split("T")[0]}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Slot</label>
                       <select
-                        value={formData.paymentMode}
-                        onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
+                        value={formData.slotId}
+                        onChange={(e) => setFormData({ ...formData, slotId: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
                       >
-                        <option value="">Select payment mode</option>
-                        <option value="cash">Cash</option>
-                        <option value="card">Card</option>
-                        <option value="upi">UPI</option>
-                        <option value="netbanking">Net Banking</option>
-                        <option value="cheque">Cheque</option>
+                        <option value="">Select slot</option>
+                        {slots.map((slot) => {
+                          const s = slot as Slot;
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.startTime} - {s.endTime})
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                      <Input
+                        type="time"
+                        value={formData.time}
+                        onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
+                      <select
+                        value={formData.duration}
+                        onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value={10}>10 minutes</option>
+                        <option value={15}>15 minutes</option>
+                        <option value={30}>30 minutes</option>
+                        <option value={45}>45 minutes</option>
+                        <option value={60}>60 minutes</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      <select
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as typeof formData.type })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="new">New Patient</option>
+                        <option value="follow-up">Follow-up</option>
+                        <option value="consultation">Consultation</option>
+                        <option value="emergency">Emergency</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Token Number</label>
+                      <Input
+                        type="number"
+                        value={formData.tokenNumber || ""}
+                        onChange={(e) => setFormData({ ...formData, tokenNumber: parseInt(e.target.value) || 0 })}
+                        min={1}
+                        placeholder="Auto-generated"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Visit Mode</label>
+                      <select
+                        value={formData.visitMode}
+                        onChange={(e) => setFormData({ ...formData, visitMode: e.target.value as typeof formData.visitMode })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="in-person">In-Person</option>
+                        <option value="tele">Teleconsultation</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      <select
+                        value={formData.priority}
+                        onChange={(e) => setFormData({ ...formData, priority: e.target.value as typeof formData.priority })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="vip">VIP</option>
+                        <option value="emergency">Emergency</option>
+                        <option value="doctor-priority">Doctor Priority</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Any additional notes..."
+                    />
+                  </div>
+                </Card>
+              </div>
+
+              {/* Right Column: Fee Payment */}
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Fee Payment</h2>
+                  
+                  {/* Fee Exemption Toggle */}
+                  <div className="mb-6">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.feeExempt}
+                        onChange={(e) => setFormData({ ...formData, feeExempt: e.target.checked, advancePaid: 0, feeAmount: 0, feeTypeId: "" })}
+                        className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <span className="font-medium text-gray-900">Exempt from Fee (Doctor Approval)</span>
+                    </label>
+                    <p className="text-sm text-gray-500 mt-1 ml-8">
+                      Check this if the doctor has approved fee exemption for this patient
+                    </p>
+                  </div>
+
+                  {!formData.feeExempt && (
+                    <>
+                      {/* Fee Type Selection */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fee Type</label>
+                        <select
+                          value={formData.feeTypeId}
+                          onChange={(e) => handleFeeTypeChange(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select fee type</option>
+                          {feeTypes.map((fee) => {
+                            const f = fee as FeeType;
+                            return (
+                              <option key={f.id} value={f.id}>
+                                {f.name} - ₹{f.amount}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Fee amount auto-fills based on appointment type. You can change it here.
+                        </p>
+                      </div>
+
+                      {/* Fee Amount */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (₹)</label>
+                        <Input
+                          type="number"
+                          value={formData.feeAmount || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "") {
+                              setFormData({ ...formData, feeAmount: 0 });
+                            } else {
+                              setFormData({ ...formData, feeAmount: parseInt(val) || 0 });
+                            }
+                          }}
+                          min={0}
+                          className="w-full"
+                          placeholder="Enter or select fee amount"
+                        />
+                      </div>
+
+                      {/* Advance Payment */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Advance Payment (₹)</label>
+                        <Input
+                          type="number"
+                          value={formData.advancePaid || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "") {
+                              setFormData({ ...formData, advancePaid: 0 });
+                            } else {
+                              const advance = parseInt(val) || 0;
+                              setFormData({ ...formData, advancePaid: Math.min(advance, formData.feeAmount) });
+                            }
+                          }}
+                          min={0}
+                          max={formData.feeAmount}
+                          className="w-full"
+                          placeholder="Enter advance amount"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">
+                          Balance: ₹{(formData.feeAmount - formData.advancePaid).toFixed(0)} | 
+                          {formData.advancePaid >= formData.feeAmount ? (
+                            <span className="text-green-600 font-medium">Fully Paid</span>
+                          ) : formData.advancePaid > 0 ? (
+                            <span className="text-yellow-600 font-medium">Partial Payment</span>
+                          ) : (
+                            <span className="text-gray-500">Pay Later</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Payment Mode */}
+                      {formData.advancePaid > 0 && (
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode</label>
+                          <select
+                            value={formData.paymentMode}
+                            onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Select payment mode</option>
+                            <option value="cash">Cash</option>
+                            <option value="card">Card</option>
+                            <option value="upi">UPI</option>
+                            <option value="netbanking">Net Banking</option>
+                            <option value="cheque">Cheque</option>
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
-                </>
-              )}
 
-              {/* Fee Exemption Reason */}
-              {formData.feeExempt && (
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Exemption Reason</label>
-                  <Input
-                    value={formData.feeExemptionReason}
-                    onChange={(e) => setFormData({ ...formData, feeExemptionReason: e.target.value })}
-                    placeholder="Enter reason for fee exemption"
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </Card>
+                  {/* Fee Exemption Reason */}
+                  {formData.feeExempt && (
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Exemption Reason</label>
+                      <Input
+                        value={formData.feeExemptionReason}
+                        onChange={(e) => setFormData({ ...formData, feeExemptionReason: e.target.value })}
+                        placeholder="Enter reason for fee exemption"
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                </Card>
+              </div>
+            </div>
 
-            {/* Submit Button */}
-            <div className="flex gap-4">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Booking..." : "Book Appointment"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => router.push("/appointments")}>
-                Cancel
-              </Button>
+            {/* Sticky Submit Button */}
+            <div className="sticky bottom-4 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 -mx-6 lg:mx-0 lg:ml-[33.333%] lg:max-w-[66.666%]">
+              <div className="flex gap-4">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Booking..." : "Book Appointment"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => router.push("/appointments")}>
+                  Cancel
+                </Button>
+              </div>
             </div>
           </form>
         </div>
