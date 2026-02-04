@@ -1174,9 +1174,57 @@ export const tokenSettingsDb = {
   },
 };
 
+// ============================================
+// Module 4: Fee Type Operations
+// ============================================
+
+export const feeDb = {
+  getAll: () => db.getAll('feeTypes'),
+  getById: (id: string) => db.getById('feeTypes', id),
+  getActive: () => {
+    const fees = db.getAll('feeTypes');
+    return fees.filter((f: unknown) => {
+      const fee = f as { isActive: boolean };
+      return fee.isActive;
+    }).sort((a, b) => {
+      const feeA = a as { displayOrder: number };
+      const feeB = b as { displayOrder: number };
+      return (feeA.displayOrder || 0) - (feeB.displayOrder || 0);
+    });
+  },
+  create: (fee: Parameters<typeof db.create>[1]) => db.create('feeTypes', fee),
+  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('feeTypes', id, updates),
+  delete: (id: string) => db.delete('feeTypes', id),
+  toggleActive: (id: string) => {
+    const fee = db.getById('feeTypes', id);
+    if (fee) {
+      const f = fee as { isActive: boolean };
+      db.update('feeTypes', id, { isActive: !f.isActive });
+    }
+  },
+};
+
+// Seed default fee types if none exist
+function ensureDefaultFeeTypes(): void {
+  const fees = db.getAll('feeTypes');
+  if (fees.length === 0) {
+    const defaultFees = [
+      { name: 'New Patient', amount: 300, description: 'First visit consultation fee', isActive: true, displayOrder: 0 },
+      { name: 'Follow Up', amount: 150, description: 'Subsequent visit consultation fee', isActive: true, displayOrder: 1 },
+      { name: 'Free Follow Up', amount: 0, description: 'Complimentary follow-up visit', isActive: true, displayOrder: 2 },
+    ];
+    defaultFees.forEach((fee) => {
+      db.create('feeTypes', fee);
+    });
+  }
+}
+
 export function ensureModule2DataSeeded(): void {
   const roles = db.getAll('roles');
   if (roles.length === 0) {
     seedModule2Data();
   }
 }
+
+// Call ensureDefaultFeeTypes when module loads
+ensureDefaultFeeTypes();

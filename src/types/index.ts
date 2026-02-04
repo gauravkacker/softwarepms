@@ -14,6 +14,18 @@ export interface PatientTag {
 // Visit Mode (Module 4 - Updated - kept old values for backward compatibility)
 export type VisitMode = 'in-person' | 'tele' | 'video' | 'self-repeat';
 
+// Fee Type (Customizable fee types for appointments)
+export interface FeeType {
+  id: string;
+  name: string; // e.g., "New Patient", "Follow Up", "Free Follow Up"
+  amount: number; // Default amount in rupees
+  description?: string;
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Visit Status
 export type VisitStatus = 'completed' | 'cancelled' | 'no-show';
 

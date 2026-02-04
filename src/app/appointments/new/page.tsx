@@ -7,14 +7,15 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { appointmentDb, patientDb, slotDb, feeHistoryDb } from "@/lib/db/database";
-import type { Appointment, Patient, Slot } from "@/types";
+import { appointmentDb, patientDb, slotDb, feeHistoryDb, feeDb } from "@/lib/db/database";
+import type { Appointment, Patient, Slot, FeeType } from "@/types";
 
 export default function NewAppointmentPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [formData, setFormData] = useState({
@@ -27,6 +28,7 @@ export default function NewAppointmentPage() {
     priority: "normal" as const,
     notes: "",
     // Fee handling
+    feeTypeId: "",
     feeStatus: "pending" as const,
     feeAmount: 0,
     advancePaid: 0,
@@ -43,6 +45,9 @@ export default function NewAppointmentPage() {
     const activeSlots = slotDb.getActive() as Slot[];
     setSlots(activeSlots);
     
+    const activeFees = feeDb.getActive() as FeeType[];
+    setFeeTypes(activeFees);
+    
     if (activeSlots.length > 0) {
       setFormData((prev) => ({ ...prev, slotId: activeSlots[0].id }));
     }
@@ -52,6 +57,44 @@ export default function NewAppointmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     loadData();
   }, [loadData]);
+
+  // Auto-fill fee when appointment type changes
+  useEffect(() => {
+    if (formData.feeExempt) return;
+    
+    // Map appointment type to fee type name
+    const typeToFeeName: Record<string, string> = {
+      'new': 'New Patient',
+      'follow-up': 'Follow Up',
+      'consultation': 'Follow Up',
+      'emergency': 'New Patient',
+    };
+    
+    const targetFeeName = typeToFeeName[formData.type] || 'Follow Up';
+    const matchingFee = feeTypes.find(f => (f as FeeType).name === targetFeeName);
+    
+    if (matchingFee) {
+      const fee = matchingFee as FeeType;
+      setFormData((prev) => ({
+        ...prev,
+        feeTypeId: fee.id,
+        feeAmount: fee.amount,
+      }));
+    }
+  }, [formData.type, feeTypes, formData.feeExempt]);
+
+  // Handle manual fee type selection
+  const handleFeeTypeChange = (feeTypeId: string) => {
+    const selectedFee = feeTypes.find(f => (f as FeeType).id === feeTypeId);
+    if (selectedFee) {
+      const fee = selectedFee as FeeType;
+      setFormData((prev) => ({
+        ...prev,
+        feeTypeId: fee.id,
+        feeAmount: fee.amount,
+      }));
+    }
+  };
 
   const filteredPatients = patients.filter((patient) => {
     const p = patient as { firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
@@ -114,6 +157,10 @@ export default function NewAppointmentPage() {
       finalFeeStatus = 'paid';
     }
 
+    // Get selected fee type name
+    const selectedFeeType = feeTypes.find(f => (f as FeeType).id === formData.feeTypeId);
+    const feeTypeName = selectedFeeType ? (selectedFeeType as FeeType).name : 'Follow Up';
+
     // Create appointment
     const newAppointment = appointmentDb.create({
       patientId: selectedPatient.id,
@@ -131,6 +178,7 @@ export default function NewAppointmentPage() {
       priority: formData.priority,
       feeStatus: finalFeeStatus,
       feeAmount: finalFeeAmount,
+      feeType: feeTypeName,
       notes: formData.notes,
       isWalkIn: false,
       reminderSent: false,
@@ -375,7 +423,7 @@ export default function NewAppointmentPage() {
                   <input
                     type="checkbox"
                     checked={formData.feeExempt}
-                    onChange={(e) => setFormData({ ...formData, feeExempt: e.target.checked, advancePaid: 0, feeAmount: 0 })}
+                    onChange={(e) => setFormData({ ...formData, feeExempt: e.target.checked, advancePaid: 0, feeAmount: 0, feeTypeId: "" })}
                     className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                   />
                   <span className="font-medium text-gray-900">Exempt from Fee (Doctor Approval)</span>
@@ -387,6 +435,29 @@ export default function NewAppointmentPage() {
 
               {!formData.feeExempt && (
                 <>
+                  {/* Fee Type Selection */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fee Type</label>
+                    <select
+                      value={formData.feeTypeId}
+                      onChange={(e) => handleFeeTypeChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select fee type</option>
+                      {feeTypes.map((fee) => {
+                        const f = fee as FeeType;
+                        return (
+                          <option key={f.id} value={f.id}>
+                            {f.name} - ₹{f.amount}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Fee amount auto-fills based on appointment type. You can change it here.
+                    </p>
+                  </div>
+
                   {/* Fee Amount */}
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (₹)</label>
@@ -396,7 +467,7 @@ export default function NewAppointmentPage() {
                       onChange={(e) => setFormData({ ...formData, feeAmount: parseInt(e.target.value) || 0 })}
                       min={0}
                       className="w-full"
-                      placeholder="Enter fee amount"
+                      placeholder="Enter or select fee amount"
                     />
                   </div>
 
@@ -455,51 +526,20 @@ export default function NewAppointmentPage() {
                   <Input
                     value={formData.feeExemptionReason}
                     onChange={(e) => setFormData({ ...formData, feeExemptionReason: e.target.value })}
-                    className="w-full"
                     placeholder="Enter reason for fee exemption"
-                    required={formData.feeExempt}
+                    className="w-full"
                   />
                 </div>
               )}
-
-              {/* Fee Summary */}
-              <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-900">Payment Status:</span>
-                  {formData.feeExempt ? (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                      Fee Exempted
-                    </span>
-                  ) : formData.advancePaid >= formData.feeAmount ? (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                      Paid (₹{formData.advancePaid})
-                    </span>
-                  ) : formData.advancePaid > 0 ? (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                      Partial (₹{formData.advancePaid} / ₹{formData.feeAmount})
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                      Pay Later (₹{formData.feeAmount})
-                    </span>
-                  )}
-                </div>
-              </div>
             </Card>
 
-            {/* Actions */}
+            {/* Submit Button */}
             <div className="flex gap-4">
-              <Link href="/appointments" className="flex-1">
-                <Button type="button" variant="secondary" className="w-full">
-                  Cancel
-                </Button>
-              </Link>
-              <Button 
-                type="submit" 
-                disabled={!selectedPatient || !formData.slotId || isSubmitting || (formData.feeExempt && !formData.feeExemptionReason)} 
-                className="flex-1"
-              >
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Booking..." : "Book Appointment"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => router.push("/appointments")}>
+                Cancel
               </Button>
             </div>
           </form>
