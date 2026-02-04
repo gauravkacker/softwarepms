@@ -59,6 +59,7 @@ export default function NewPatientPage() {
 
   // Collapsible section states
   const [addressExpanded, setAddressExpanded] = useState(false);
+  const [additionalExpanded, setAdditionalExpanded] = useState(false);
   const [medicalExpanded, setMedicalExpanded] = useState(false);
 
   // Form state
@@ -245,7 +246,7 @@ export default function NewPatientPage() {
         createdBy: "current-user",
       };
 
-      const newPatient = patientDb.create(patient);
+      const newPatient = patientDb.create(patient) as Patient;
 
       if (bookAppointment) {
         // Navigate to appointments page with patient data pre-filled
@@ -398,17 +399,6 @@ export default function NewPatientPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date of Birth <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="date"
-                    name="dateOfBirth"
-                    value={formData.dateOfBirth}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Age <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -417,8 +407,19 @@ export default function NewPatientPage() {
                     value={formData.age}
                     onChange={handleInputChange}
                     placeholder="Enter age in years"
-                    min="0"
-                    max="150"
+                    maxLength={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    name="dateOfBirth"
+                    value={formData.dateOfBirth}
+                    onChange={handleInputChange}
+                    disabled={!!formData.age}
                   />
                 </div>
                 <div>
@@ -447,7 +448,9 @@ export default function NewPatientPage() {
                     name="mobileNumber"
                     value={formData.mobileNumber}
                     onChange={handleInputChange}
-                    placeholder="+91-XXXXXXXXXX"
+                    placeholder="10-digit mobile number"
+                    maxLength={10}
+                    pattern="[0-9]{10}"
                     required
                   />
                 </div>
@@ -565,9 +568,12 @@ export default function NewPatientPage() {
               </div>
             </CollapsibleSection>
 
-            {/* Additional Information */}
-            <Card className="p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h2>
+            {/* Additional Information - Collapsible */}
+            <CollapsibleSection
+              title="Additional Information"
+              isOpen={additionalExpanded}
+              onToggle={() => setAdditionalExpanded(!additionalExpanded)}
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -620,7 +626,7 @@ export default function NewPatientPage() {
                   />
                 </div>
               </div>
-            </Card>
+            </CollapsibleSection>
 
             {/* Medical Information - Collapsible */}
             <CollapsibleSection
@@ -711,7 +717,7 @@ export default function NewPatientPage() {
             </Card>
 
             {/* Submit Button */}
-            <div className="flex justify-end gap-3">
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3 -mx-6 -mb-6 mt-6">
               <Button
                 type="button"
                 variant="secondary"
