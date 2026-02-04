@@ -20,19 +20,21 @@ export default function RegistrationSettingsPage() {
     startingNumber: "1001",
     padding: "4",
     separator: "-",
+    tokenMode: "session",
   });
 
   // Load settings
   useEffect(() => {
     const loadSettings = () => {
       setIsLoading(true);
-      const settings = settingsDb.getById("registration") as { prefix?: string; startingNumber?: number; padding?: number; separator?: string } | undefined;
+      const settings = settingsDb.getById("registration") as { prefix?: string; startingNumber?: number; padding?: number; separator?: string; tokenMode?: string } | undefined;
       if (settings) {
         setFormData({
           prefix: settings.prefix || "DK-",
           startingNumber: String(settings.startingNumber || 1001),
           padding: String(settings.padding || 4),
           separator: settings.separator || "-",
+          tokenMode: settings.tokenMode || "session",
         });
       }
       setIsLoading(false);
@@ -64,6 +66,7 @@ export default function RegistrationSettingsPage() {
         startingNumber: parseInt(formData.startingNumber) || 1001,
         padding: parseInt(formData.padding) || 4,
         separator: formData.separator,
+        tokenMode: formData.tokenMode,
         updatedAt: new Date(),
       };
       settingsDb.upsert("registration", settings);
@@ -212,6 +215,42 @@ export default function RegistrationSettingsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </Card>
+
+              {/* Token Mode Settings */}
+              <Card className="p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-2">Token Number Mode</h2>
+                <p className="text-sm text-gray-500 mb-4">Choose how token numbers are assigned for appointments</p>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 p-4 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="tokenMode"
+                      value="session"
+                      checked={formData.tokenMode === "session"}
+                      onChange={(e) => setFormData({ ...formData, tokenMode: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">New Session (Reset Daily)</p>
+                      <p className="text-sm text-gray-500">Token numbers start from 1 each day/session</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-4 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="tokenMode"
+                      value="continuous"
+                      checked={formData.tokenMode === "continuous"}
+                      onChange={(e) => setFormData({ ...formData, tokenMode: e.target.value })}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">Continuous</p>
+                      <p className="text-sm text-gray-500">Token numbers continue from where they left off</p>
+                    </div>
+                  </label>
                 </div>
               </Card>
 

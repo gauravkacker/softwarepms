@@ -14,10 +14,12 @@ export default function NewAppointmentPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [recentPatients, setRecentPatients] = useState<Patient[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [bookedPatientIds, setBookedPatientIds] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     slotId: "",
@@ -42,7 +44,13 @@ export default function NewAppointmentPage() {
 
   const loadData = useCallback(() => {
     const allPatients = patientDb.getAll() as Patient[];
-    setPatients(allPatients);
+    // Sort by createdAt descending and take top 10 for recent patients
+    const sortedPatients = [...allPatients].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    setRecentPatients(sortedPatients.slice(0, 10));
     
     const activeSlots = slotDb.getActive() as Slot[];
     setSlots(activeSlots);
@@ -113,8 +121,11 @@ export default function NewAppointmentPage() {
     }
   };
 
-  const filteredPatients = patients.filter((patient) => {
-    const p = patient as { firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
+  const filteredPatients = recentPatients.filter((patient) => {
+    const p = patient as { id: string; firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
+    // Skip if already booked in this session
+    if (bookedPatientIds.has(p.id)) return false;
+    
     const query = searchQuery.toLowerCase();
     return (
       p.firstName.toLowerCase().includes(query) ||
@@ -279,6 +290,7 @@ export default function NewAppointmentPage() {
                           onClick={() => {
                             setSelectedPatient(patient);
                             setSearchQuery("");
+                            setBookedPatientIds(prev => new Set(prev).add(p.id));
                           }}
                           className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
                         >

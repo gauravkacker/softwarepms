@@ -7,28 +7,40 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import { appointmentDb, patientDb } from "@/lib/db/database";
-import type { Appointment } from "@/types";
+import { appointmentDb, patientDb, slotDb } from "@/lib/db/database";
+import type { Appointment, Slot } from "@/types";
 
 export default function AppointmentsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [slotFilter, setSlotFilter] = useState<string>("all");
 
   const loadAppointments = useCallback(() => {
     setIsLoading(true);
+    
+    // Load slots for filter
+    const allSlots = slotDb.getActive() as Slot[];
+    setSlots(allSlots);
+    
     const allAppointments = appointmentDb.getAll() as Appointment[];
     
     // Filter by date if selected
-    const filtered = dateFilter
+    let filtered = dateFilter
       ? allAppointments.filter((a: Appointment) => {
           const aptDate = new Date(a.appointmentDate).toISOString().split("T")[0];
           return aptDate === dateFilter;
         })
       : allAppointments;
+    
+    // Filter by slot if selected
+    if (slotFilter !== "all") {
+      filtered = filtered.filter((a: Appointment) => a.slotId === slotFilter);
+    }
     
     const sortedAppointments = filtered.sort((a, b) => {
       return a.appointmentTime.localeCompare(b.appointmentTime);
@@ -36,7 +48,7 @@ export default function AppointmentsPage() {
     
     setAppointments(sortedAppointments);
     setIsLoading(false);
-  }, [dateFilter]);
+  }, [dateFilter, slotFilter]);
 
   useEffect(() => {
     loadAppointments();
@@ -182,6 +194,24 @@ export default function AppointmentsPage() {
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Slot</label>
+                <select
+                  value={slotFilter}
+                  onChange={(e) => setSlotFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Slots</option>
+                  {slots.map((slot) => {
+                    const s = slot as Slot;
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
               <div className="flex gap-2 items-end">
                 <Button
