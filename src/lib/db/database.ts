@@ -896,6 +896,22 @@ export const roleTemplateDb = {
   },
 };
 
+// Settings operations
+export const settingsDb = {
+  getAll: () => db.getAll('settings'),
+  getById: (id: string) => db.getById('settings', id),
+  create: (setting: Parameters<typeof db.create>[1]) => db.create('settings', setting),
+  update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('settings', id, updates),
+  upsert: (id: string, data: Parameters<typeof db.create>[1]) => {
+    const existing = db.getById('settings', id);
+    if (existing) {
+      db.update('settings', id, data);
+    } else {
+      db.create('settings', { ...data, id });
+    }
+  },
+};
+
 export function ensureModule2DataSeeded(): void {
   const roles = db.getAll('roles');
   if (roles.length === 0) {

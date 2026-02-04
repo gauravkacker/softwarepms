@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { PhotoUpload } from "@/components/ui/PhotoUpload";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { patientDb, visitDb, patientTagDb, feeHistoryDb, investigationDb, voiceNoteDb } from "@/lib/db/database";
@@ -99,6 +100,15 @@ export default function PatientProfilePage() {
     }
   };
 
+  // Handle photo upload
+  const handlePhotoUpload = (photoUrl: string) => {
+    if (patient) {
+      const updatedPatient = { ...patient, photoUrl, updatedAt: new Date() };
+      patientDb.update(patientId, updatedPatient);
+      setPatient(updatedPatient);
+    }
+  };
+
   // Get tag name by ID
   const getTagName = (tagId: string): string => {
     const tag = getTagById(tagId);
@@ -164,11 +174,13 @@ export default function PatientProfilePage() {
               </button>
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                    <span className="text-blue-600 font-medium text-lg">
-                      {patient?.firstName?.[0]}{patient?.lastName?.[0]}
-                    </span>
+                  {/* Avatar with Photo Upload */}
+                  <div className="relative">
+                    <PhotoUpload
+                      currentPhotoUrl={patient?.photoUrl}
+                      onPhotoUploaded={handlePhotoUpload}
+                      patientName={patient?.fullName || "Patient"}
+                    />
                   </div>
                   <div>
                     <h1 className="text-2xl font-semibold text-gray-900">{patient?.fullName}</h1>

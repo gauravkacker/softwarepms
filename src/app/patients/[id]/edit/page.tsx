@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { PhotoUpload } from "@/components/ui/PhotoUpload";
 import { patientDb, patientTagDb } from "@/lib/db/database";
 import type { Patient, PatientTag } from "@/types";
 
@@ -60,6 +61,7 @@ export default function EditPatientPage() {
 
   // Form state
   const [formData, setFormData] = useState({
+    photoUrl: "",
     salutation: "",
     firstName: "",
     lastName: "",
@@ -92,6 +94,7 @@ export default function EditPatientPage() {
       const patient = patientDb.getById(patientId) as Patient | undefined;
       if (patient) {
         setFormData({
+          photoUrl: patient.photoUrl || "",
           salutation: patient.salutation || "",
           firstName: patient.firstName,
           lastName: patient.lastName,
@@ -169,6 +172,7 @@ export default function EditPatientPage() {
       const age = formData.age ? parseInt(formData.age) : calculateAgeFromDob(formData.dateOfBirth);
 
       const patientUpdates = {
+        photoUrl: formData.photoUrl || undefined,
         salutation: formData.salutation,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -266,6 +270,21 @@ export default function EditPatientPage() {
 
         <main className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Profile Photo */}
+            <CollapsibleSection
+              title="Profile Photo"
+              isOpen={true}
+              onToggle={() => {}}
+            >
+              <div className="flex justify-center py-4">
+                <PhotoUpload
+                  currentPhotoUrl={formData.photoUrl}
+                  onPhotoUploaded={(url) => setFormData((prev) => ({ ...prev, photoUrl: url }))}
+                  patientName={`${formData.firstName} ${formData.lastName}`.trim() || "Patient"}
+                />
+              </div>
+            </CollapsibleSection>
+
             {/* Basic Information */}
             <CollapsibleSection
               title="Basic Information"

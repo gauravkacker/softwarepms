@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { PhotoUpload } from "@/components/ui/PhotoUpload";
 import { patientDb, patientTagDb } from "@/lib/db/database";
 import type { PatientTag, Patient } from "@/types";
 
@@ -64,6 +65,7 @@ export default function NewPatientPage() {
 
   // Form state
   const [formData, setFormData] = useState({
+    photoUrl: "",
     salutation: "",
     firstName: "",
     lastName: "",
@@ -204,6 +206,7 @@ export default function NewPatientPage() {
 
       // Create patient object (registration number is auto-generated in patientDb.create)
       const patient = {
+        photoUrl: formData.photoUrl || undefined,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         fullName: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
@@ -337,6 +340,18 @@ export default function NewPatientPage() {
           )}
 
           <div className="space-y-6">
+            {/* Profile Photo */}
+            <Card className="p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Profile Photo</h2>
+              <div className="flex justify-center">
+                <PhotoUpload
+                  currentPhotoUrl={formData.photoUrl}
+                  onPhotoUploaded={(url) => setFormData((prev) => ({ ...prev, photoUrl: url }))}
+                  patientName={`${formData.firstName} ${formData.lastName}`.trim() || "Patient"}
+                />
+              </div>
+            </Card>
+
             {/* Registration Number (Auto-generated) */}
             <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
               <div>
