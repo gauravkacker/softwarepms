@@ -120,6 +120,7 @@ export interface Patient {
   registrationNumber: string; // Unique, auto-generated, never reused
   
   // Name Fields
+  salutation?: string; // Mr., Mrs., Ms., Dr., Master, Baby
   firstName: string;
   lastName: string;
   fullName: string; // Computed: firstName + lastName

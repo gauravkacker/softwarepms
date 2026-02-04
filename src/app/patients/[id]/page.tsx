@@ -47,6 +47,8 @@ export default function PatientProfilePage() {
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Load patient data function
   const loadPatientData = () => {
@@ -78,6 +80,23 @@ export default function PatientProfilePage() {
   // Get tag by ID
   const getTagById = (tagId: string): PatientTag | undefined => {
     return tags.find((t) => t.id === tagId);
+  };
+
+  // Delete patient handler
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this patient? This action cannot be undone.")) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      patientDb.delete(patientId);
+      router.push("/patients");
+    } catch (error) {
+      console.error("Error deleting patient:", error);
+      alert("Failed to delete patient. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Get tag name by ID
@@ -173,7 +192,10 @@ export default function PatientProfilePage() {
                 <Button variant="ghost" onClick={() => router.push(`/patients/${patientId}/edit`)}>
                   Edit
                 </Button>
-                <Button variant="primary">
+                <Button variant="danger" onClick={handleDelete} loading={deleting}>
+                  Delete
+                </Button>
+                <Button variant="primary" onClick={() => router.push(`/patients/${patientId}/visits/new`)}>
                   New Visit
                 </Button>
               </div>
