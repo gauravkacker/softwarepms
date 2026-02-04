@@ -38,6 +38,7 @@ export default function NewAppointmentPage() {
     feeExemptionReason: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewTokenNumber, setPreviewTokenNumber] = useState<number>(0);
 
   const loadData = useCallback(() => {
     const allPatients = patientDb.getAll() as Patient[];
@@ -54,8 +55,23 @@ export default function NewAppointmentPage() {
     }
   }, []);
 
+  // Calculate preview token number when date or slot changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (formData.date && formData.slotId) {
+      const existingAppointments = appointmentDb.getBySlot(new Date(formData.date), formData.slotId);
+      const previewToken = (existingAppointments.length || 0) + 1;
+      setPreviewTokenNumber(previewToken);
+      // Update form token number to match preview only if not already set
+      setFormData((prev) => {
+        if (prev.tokenNumber === 0) {
+          return { ...prev, tokenNumber: previewToken };
+        }
+        return prev;
+      });
+    }
+  }, [formData.date, formData.slotId]);
+
+  useEffect(() => {
     loadData();
   }, [loadData]);
 
@@ -240,7 +256,7 @@ export default function NewAppointmentPage() {
 
         {/* Content */}
         <div className="p-6">
-          <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Patient Selection */}
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Patient</h2>
@@ -382,13 +398,20 @@ export default function NewAppointmentPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Token Number</label>
-                      <Input
-                        type="number"
-                        value={formData.tokenNumber || ""}
-                        onChange={(e) => setFormData({ ...formData, tokenNumber: parseInt(e.target.value) || 0 })}
-                        min={1}
-                        placeholder="Auto-generated"
-                      />
+                      <div className="flex items-center gap-2">
+                        <div className="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 min-w-[60px] text-center">
+                          <span className="text-xs text-blue-600 block">Preview</span>
+                          <span className="text-xl font-bold text-blue-700">{previewTokenNumber}</span>
+                        </div>
+                        <Input
+                          type="number"
+                          value={formData.tokenNumber || ""}
+                          onChange={(e) => setFormData({ ...formData, tokenNumber: parseInt(e.target.value) || 0 })}
+                          min={1}
+                          placeholder="Use preview or enter"
+                          className="flex-1"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -568,7 +591,7 @@ export default function NewAppointmentPage() {
             </div>
 
             {/* Sticky Submit Button */}
-            <div className="sticky bottom-4 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200 -mx-6 lg:mx-0 lg:ml-[33.333%] lg:max-w-[66.666%]">
+            <div className="sticky bottom-4 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-gray-200">
               <div className="flex gap-4">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "Booking..." : "Book Appointment"}

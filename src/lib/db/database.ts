@@ -18,14 +18,19 @@ const dbConfig: DatabaseConfig = {
 // NOTE: Set to empty string to preserve data between sessions
 const SCHEMA_VERSION = '';
 
-// In-memory storage for demo (will be replaced with SQLite in production)
+// LocalStorage-persisted database for offline-first functionality
 class LocalDatabase {
   private static instance: LocalDatabase;
   private store: Map<string, unknown[]>;
+  private isInitialized: boolean = false;
 
   private constructor() {
     this.store = new Map();
-    this.initializeStores();
+    this.loadFromLocalStorage();
+    // Initialize stores if not loaded from localStorage
+    if (!this.isInitialized) {
+      this.initializeStores();
+    }
   }
 
   public static getInstance(): LocalDatabase {
@@ -34,6 +39,42 @@ class LocalDatabase {
       LocalDatabase.instance = new LocalDatabase();
     }
     return LocalDatabase.instance;
+  }
+
+  private loadFromLocalStorage(): void {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const savedData = localStorage.getItem('pms_database');
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        // Check schema version
+        const savedVersion = localStorage.getItem('pms_schema_version');
+        if (savedVersion === SCHEMA_VERSION) {
+          Object.keys(parsed).forEach(key => {
+            this.store.set(key, parsed[key]);
+          });
+          this.isInitialized = true;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load from localStorage:', e);
+    }
+  }
+
+  private saveToLocalStorage(): void {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const data: Record<string, unknown[]> = {};
+      this.store.forEach((value, key) => {
+        data[key] = value;
+      });
+      localStorage.setItem('pms_database', JSON.stringify(data));
+      localStorage.setItem('pms_schema_version', SCHEMA_VERSION);
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+    }
   }
 
   private initializeStores(): void {
@@ -107,6 +148,7 @@ class LocalDatabase {
     } as T & { id: string; createdAt: Date; updatedAt: Date };
     items.push(newItem);
     this.store.set(collection, items);
+    this.saveToLocalStorage();
     return newItem;
   }
 
@@ -129,6 +171,7 @@ class LocalDatabase {
       } as T;
       items[index] = updated;
       this.store.set(collection, items);
+      this.saveToLocalStorage();
       return updated;
     }
     return undefined;
@@ -146,6 +189,7 @@ class LocalDatabase {
     if (index !== -1) {
       items.splice(index, 1);
       this.store.set(collection, items);
+      this.saveToLocalStorage();
       return true;
     }
     return false;
@@ -978,10 +1022,68 @@ export const appointmentDb = {
     cancelledAt: new Date(),
     cancellationReason: reason 
   }),
-  checkIn: (id: string) => db.update('appointments', id, { 
-    status: 'checked-in',
-    checkedInAt: new Date() 
-  }),
+  checkIn: (id: string) => {
+    db.update('appointments', id, {
+      status: 'checked-in',
+      checkedInAt: new Date()
+    });
+    // Also create queue item when checking in
+    const appointment = db.getById('appointments', id);
+    if (appointment) {
+      const apt = appointment as {
+        patientId: string;
+        patientName: string;
+        slotId: string;
+        slotName: string;
+        tokenNumber: number;
+        priority: string;
+      };
+      // Get or create queue config
+      const today = new Date();
+      let queueConfig = db.getAll('queueConfigs').find((q: unknown) => {
+        const que = q as { date: Date; slotId: string };
+        return new Date(que.date).toISOString().split('T')[0] === today.toISOString().split('T')[0] &&
+               que.slotId === apt.slotId;
+      });
+      
+      if (!queueConfig) {
+        queueConfig = db.create('queueConfigs', {
+          date: today,
+          slotId: apt.slotId,
+          slotName: apt.slotName,
+          status: 'open',
+          currentToken: 0,
+          totalPatients: 0,
+          completedPatients: 0,
+          skippedPatients: 0,
+        });
+      }
+      
+      const qConfig = queueConfig as { id: string };
+      
+      // Create queue item
+      db.create('queueItems', {
+        queueConfigId: qConfig.id,
+        appointmentId: id,
+        patientId: apt.patientId,
+        patientName: apt.patientName,
+        slotId: apt.slotId,
+        slotName: apt.slotName,
+        tokenNumber: apt.tokenNumber || 1,
+        priority: apt.priority || 'normal',
+        status: 'waiting',
+        checkInTime: new Date(),
+      });
+      
+      // Update queue config
+      const queues = db.getAll('queueConfigs');
+      const queueIndex = queues.findIndex((q: unknown) => (q as { id: string }).id === qConfig.id);
+      if (queueIndex !== -1) {
+        const que = queues[queueIndex] as { totalPatients: number };
+        db.update('queueConfigs', qConfig.id, { totalPatients: que.totalPatients + 1 });
+      }
+    }
+  },
   startConsultation: (id: string) => db.update('appointments', id, { 
     status: 'in-progress',
     consultationStartedAt: new Date() 

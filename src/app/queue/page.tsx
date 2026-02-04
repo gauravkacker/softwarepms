@@ -6,13 +6,15 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { queueDb, queueItemDb, appointmentDb, slotDb } from "@/lib/db/database";
-import type { QueueItem, QueueConfig, Slot } from "@/types";
+import { queueDb, queueItemDb, appointmentDb, slotDb, patientDb } from "@/lib/db/database";
+import type { QueueItem, QueueConfig, Slot, Appointment } from "@/types";
 
 export default function QueuePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [queueConfig, setQueueConfig] = useState<QueueConfig | null>(null);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [checkedInAppointments, setCheckedInAppointments] = useState<Appointment[]>([]);
+  const [scheduledAppointments, setScheduledAppointments] = useState<Appointment[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -38,25 +40,56 @@ export default function QueuePage() {
 
         const items = queueItemDb.getByQueueConfig(config.id) as QueueItem[];
         setQueueItems(items);
+
+        // Get all appointments for today and this slot
+        const allAppointments = appointmentDb.getAll() as Appointment[];
+        const todayDate = today.toISOString().split("T")[0];
+        
+        const todaySlotAppointments = allAppointments.filter((apt: Appointment) => {
+          const aptDate = new Date(apt.appointmentDate).toISOString().split("T")[0];
+          return aptDate === todayDate && apt.slotId === selectedSlot;
+        });
+
+        // Separate checked-in and scheduled
+        const checked = todaySlotAppointments.filter((apt: Appointment) => 
+          ["checked-in", "in-consultation"].includes(apt.status)
+        );
+        const scheduled = todaySlotAppointments.filter((apt: Appointment) => 
+          ["scheduled", "confirmed"].includes(apt.status)
+        );
+
+        setCheckedInAppointments(checked);
+        setScheduledAppointments(scheduled);
       }
     }
     setIsLoading(false);
   }, [selectedSlot]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadQueue();
   }, [loadQueue]);
 
   const getPatientName = (patientId: string): string => {
-    if (typeof window === "undefined") return "Loading...";
-    const patientDb = require("@/lib/db/database").patientDb;
     const patient = patientDb.getById(patientId);
     if (patient) {
       const p = patient as { firstName: string; lastName: string };
       return `${p.firstName} ${p.lastName}`;
     }
     return "Unknown";
+  };
+
+  const getPatientRegNumber = (patientId: string): string => {
+    const patient = patientDb.getById(patientId);
+    if (patient) {
+      const p = patient as { registrationNumber: string };
+      return p.registrationNumber || "";
+    }
+    return "";
+  };
+
+  const handleCheckInFromQueue = (appointmentId: string) => {
+    appointmentDb.checkIn(appointmentId);
+    loadQueue();
   };
 
   const handleOpenQueue = () => {
@@ -223,6 +256,55 @@ export default function QueuePage() {
               )}
             </div>
           </div>
+
+          {/* Scheduled Appointments for Check-in */}
+          {scheduledAppointments.length > 0 && (
+            <Card className="overflow-hidden">
+              <div className="p-4 border-b border-gray-200 bg-blue-50">
+                <h2 className="text-lg font-semibold text-gray-900">Scheduled Appointments - Check In</h2>
+                <p className="text-sm text-gray-600">Click check-in to add patient to queue</p>
+              </div>
+              <div className="divide-y divide-gray-200">
+                {scheduledAppointments.map((apt) => {
+                  const appointment = apt as Appointment;
+                  return (
+                    <div key={appointment.id} className="p-4 flex items-center justify-between hover:bg-blue-50">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold bg-blue-100 text-blue-700">
+                          {appointment.tokenNumber || "-"}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-900">
+                              {getPatientName(appointment.patientId)}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              ({getPatientRegNumber(appointment.patientId)})
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {appointment.appointmentTime} • {appointment.type}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/patients/${appointment.patientId}`}>
+                          <Button variant="secondary" size="sm">View</Button>
+                        </Link>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleCheckInFromQueue(appointment.id)}
+                        >
+                          Check In
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4">

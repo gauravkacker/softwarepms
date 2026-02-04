@@ -38,7 +38,8 @@ export default function AppointmentDetailPage() {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
 
   const getPatientName = (): string => {
     if (!patient) return "Unknown Patient";
@@ -110,7 +111,7 @@ export default function AppointmentDetailPage() {
           <div className="p-8">
             <Card className="p-8 text-center">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Appointment Not Found</h2>
-              <p className="text-gray-500 mb-4">The appointment you're looking for doesn't exist.</p>
+              <p className="text-gray-500 mb-4">The appointment you&apos;re looking for doesn&apos;t exist.</p>
               <Link href="/appointments">
                 <Button variant="primary">Back to Appointments</Button>
               </Link>

@@ -39,7 +39,6 @@ export default function AppointmentsPage() {
   }, [dateFilter]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAppointments();
   }, [loadAppointments]);
 
@@ -253,6 +252,12 @@ export default function AppointmentsPage() {
                 <Card key={appointment.id} className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
+                      <div className="text-center bg-blue-50 rounded-lg p-3 min-w-[80px] border-2 border-blue-200">
+                        <div className="text-xs text-blue-600 font-medium">Token</div>
+                        <div className="text-3xl font-bold text-blue-700">
+                          {appointment.tokenNumber || "-"}
+                        </div>
+                      </div>
                       <div className="text-center bg-gray-100 rounded-lg p-3 min-w-[80px]">
                         <div className="text-sm text-gray-500">
                           {formatDate(appointment.appointmentDate).split(",")[0]}
@@ -278,7 +283,6 @@ export default function AppointmentsPage() {
                         <p className="text-sm text-gray-500">
                           {appointment.appointmentTime} • {appointment.duration} min
                           {appointment.slotName && ` • ${appointment.slotName}`}
-                          {appointment.tokenNumber && ` • Token #${appointment.tokenNumber}`}
                         </p>
                         <div className="flex gap-2 mt-2">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(appointment.type)}`}>
