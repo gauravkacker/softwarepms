@@ -46,7 +46,9 @@ export default function TagManagementPage() {
     setIsLoading(false);
   };
 
+  // Load tags on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadTags();
   }, []);
 
@@ -55,6 +57,7 @@ export default function TagManagementPage() {
     const existingTags = patientTagDb.getAll() as PatientTag[];
     if (existingTags.length === 0) {
       SYSTEM_TAGS.forEach(tag => patientTagDb.create(tag as unknown as Record<string, unknown>));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       loadTags();
     }
   }, []);
@@ -351,7 +354,7 @@ export default function TagManagementPage() {
             <div className="p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-2">Delete Tag</h2>
               <p className="text-gray-500 mb-4">
-                Are you sure you want to delete "{showDeleteConfirm.name}"?
+                Are you sure you want to delete &quot;{showDeleteConfirm.name}&quot;?
                 This will remove the tag from all patients.
               </p>
               <div className="flex gap-2">

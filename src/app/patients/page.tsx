@@ -49,7 +49,9 @@ export default function PatientsPage() {
     setIsLoading(false);
   };
 
+  // Load patients on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadData();
   }, []);
 
