@@ -173,6 +173,7 @@ bun start
 | 2026-02-03 | Module 4: Appointment Scheduler, Queue, Fee structure |
 | 2026-02-04 | Module 4: Token mode, slot filter, patient dropdown, settings index |
 | 2026-02-05 | Fix lint errors for setState in useEffect hooks |
+| 2026-02-05 | Fix appointment booking to search all patients (not just recent) |
 
 ## Key Architecture Rules (from Module 1)
 
