@@ -569,7 +569,8 @@ export const patientDb = {
   },
   generateRegNumber: () => db.generateRegNumber(),
   create: (patient: Parameters<typeof db.create>[1]) => {
-    const regNumber = db.generateRegNumber();
+    // Use existing registration number if provided, otherwise generate new one
+    const regNumber = patient.registrationNumber || db.generateRegNumber();
     return db.create('patients', { ...patient, registrationNumber: regNumber });
   },
   update: (id: string, updates: Parameters<typeof db.update>[2]) => db.update('patients', id, updates),
@@ -582,10 +583,12 @@ export const patientDb = {
         registrationNumber: string;
         firstName: string;
         lastName: string;
+        fullName: string;
         mobileNumber: string;
       };
       return (
         patient.registrationNumber.toLowerCase().includes(lowerQuery) ||
+        patient.fullName.toLowerCase().includes(lowerQuery) ||
         patient.firstName.toLowerCase().includes(lowerQuery) ||
         patient.lastName.toLowerCase().includes(lowerQuery) ||
         patient.mobileNumber.includes(query)
