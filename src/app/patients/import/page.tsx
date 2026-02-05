@@ -88,25 +88,14 @@ export default function ImportPatientsPage() {
           continue;
         }
 
-        // Check for duplicate (by name or mobile if mobile provided)
+        // Check for duplicate by registration number only (same family can have same mobile)
         const existingPatients = patientDb.getAll() as Patient[];
-        const duplicateName = existingPatients.some(
-          (p: Patient) => p.firstName.toLowerCase() === firstName.toLowerCase() && 
-                         p.lastName.toLowerCase() === lastName.toLowerCase()
-        );
-        
-        // Only check mobile duplicate if mobile is provided
-        const duplicateMobile = mobile ? existingPatients.some(
-          (p: Patient) => p.mobileNumber === mobile
+        const duplicateRegNumber = regNo ? existingPatients.some(
+          (p: Patient) => p.registrationNumber.toLowerCase() === regNo.toLowerCase()
         ) : false;
-
-        if (duplicateName) {
-          errors.push(`Row ${i + 1}: Patient '${firstName} ${lastName}' already exists`);
-          continue;
-        }
         
-        if (duplicateMobile) {
-          errors.push(`Row ${i + 1}: Mobile number ${mobile} already exists`);
+        if (duplicateRegNumber && regNo) {
+          errors.push(`Row ${i + 1}: Registration number '${regNo}' already exists`);
           continue;
         }
 

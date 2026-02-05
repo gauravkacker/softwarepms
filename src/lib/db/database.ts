@@ -596,6 +596,25 @@ export const patientDb = {
     });
   },
   findDuplicates: (name: string, mobile?: string) => db.findDuplicates('patients', name, mobile),
+  deleteByRegNumber: (regNumber: string) => {
+    const patients = db.getAll('patients');
+    const patient = patients.find((p: unknown) => {
+      const pt = p as { registrationNumber: string };
+      return pt.registrationNumber === regNumber;
+    });
+    if (patient) {
+      db.delete('patients', (patient as { id: string }).id);
+      return true;
+    }
+    return false;
+  },
+  deleteAll: () => {
+    const patients = db.getAll('patients');
+    patients.forEach((p: unknown) => {
+      const patient = p as { id: string };
+      db.delete('patients', patient.id);
+    });
+  },
 };
 
 // Visit operations

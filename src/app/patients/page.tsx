@@ -39,6 +39,9 @@ export default function PatientsPage() {
   const [tags, setTags] = useState<PatientTag[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteType, setDeleteType] = useState<'selected' | 'all'>('selected');
 
   const loadData = () => {
     setIsLoading(true);
@@ -108,6 +111,65 @@ export default function PatientsPage() {
     router.push("/patients/new");
   };
 
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    setSelectedIds((prev) => (prev.size > 0 ? new Set() : new Set()));
+  };
+
+  // Toggle single patient selection
+  const togglePatientSelection = (patientId: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(patientId)) {
+        newSet.delete(patientId);
+      } else {
+        newSet.add(patientId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/deselect all visible patients
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredPatients.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredPatients.map((p) => p.id)));
+    }
+  };
+
+  // Delete selected patients
+  const handleDeleteSelected = () => {
+    setDeleteType('selected');
+    setShowDeleteConfirm(true);
+  };
+
+  // Delete all patients
+  const handleDeleteAll = () => {
+    setDeleteType('all');
+    setShowDeleteConfirm(true);
+  };
+
+  // Confirm deletion
+  const confirmDelete = () => {
+    if (deleteType === 'all') {
+      // Delete all patients and their visits
+      const allPatients = patientDb.getAll() as Patient[];
+      allPatients.forEach((patient) => {
+        patientDb.delete(patient.id);
+      });
+      setPatients([]);
+    } else {
+      // Delete selected patients
+      selectedIds.forEach((id) => {
+        patientDb.delete(id);
+      });
+      setPatients((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+      setSelectedIds(new Set());
+    }
+    setShowDeleteConfirm(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
@@ -126,15 +188,33 @@ export default function PatientsPage() {
                 Manage patient records, history, and visits
               </p>
             </div>
-            <Button onClick={handleAddPatient} variant="primary">
-              + Add Patient
-            </Button>
+            <div className="flex gap-2">
+              {selectedIds.size > 0 ? (
+                <>
+                  <Button onClick={toggleSelectionMode} variant="secondary">
+                    Cancel ({selectedIds.size})
+                  </Button>
+                  <Button onClick={handleDeleteSelected} variant="danger">
+                    Delete Selected
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={handleDeleteAll} variant="secondary">
+                    Delete All
+                  </Button>
+                  <Button onClick={handleAddPatient} variant="primary">
+                    + Add Patient
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Search and Filters */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <div className="flex-1">
               <Input
                 type="text"
@@ -144,8 +224,19 @@ export default function PatientsPage() {
                 className="w-full"
               />
             </div>
-            <div className="text-sm text-gray-500 flex items-center">
-              {filteredPatients.length} patient{filteredPatients.length !== 1 ? "s" : ""} found
+            <div className="text-sm text-gray-500 flex items-center gap-2">
+              {selectedIds.size > 0 ? (
+                <Button onClick={toggleSelectAll} variant="ghost" size="sm">
+                  {selectedIds.size === filteredPatients.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              ) : (
+                <Button onClick={toggleSelectionMode} variant="ghost" size="sm">
+                  Select Patients
+                </Button>
+              )}
+              <span className="ml-2">
+                {filteredPatients.length} patient{filteredPatients.length !== 1 ? "s" : ""} found
+              </span>
             </div>
           </div>
         </div>
@@ -184,12 +275,33 @@ export default function PatientsPage() {
                 return (
                   <Card
                     key={patient.id}
-                    className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handlePatientClick(patient.id)}
+                    className={`p-4 hover:shadow-md transition-shadow ${
+                      selectedIds.has(patient.id) ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                    }`}
                   >
                     <div className="flex items-start gap-4">
+                      {/* Selection Checkbox */}
+                      <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(patient.id)}
+                          onChange={() => togglePatientSelection(patient.id)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </div>
+
                       {/* Avatar */}
-                      <div className="flex-shrink-0">
+                      <div
+                        className="flex-shrink-0 cursor-pointer"
+                        onClick={(e) => {
+                          if (selectedIds.size > 0) {
+                            e.stopPropagation();
+                            togglePatientSelection(patient.id);
+                          } else {
+                            handlePatientClick(patient.id);
+                          }
+                        }}
+                      >
                         {patient.photoUrl ? (
                           <img
                             src={patient.photoUrl}
@@ -294,6 +406,30 @@ export default function PatientsPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {deleteType === 'all' ? 'Delete All Patients?' : 'Delete Selected Patients?'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {deleteType === 'all'
+                ? 'This will permanently delete all patients and their data. This action cannot be undone.'
+                : `This will permanently delete ${selectedIds.size} patient(s) and their data. This action cannot be undone.`}
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button onClick={() => setShowDeleteConfirm(false)} variant="secondary">
+                Cancel
+              </Button>
+              <Button onClick={confirmDelete} variant="danger">
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
