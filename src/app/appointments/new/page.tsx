@@ -124,18 +124,28 @@ export default function NewAppointmentPage() {
     }
   };
 
-  const filteredPatients = recentPatients.filter((patient) => {
+  const filteredPatients = patients.filter((patient) => {
     const p = patient as { id: string; firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
     // Skip if already booked in this session
     if (bookedPatientIds.has(p.id)) return false;
     
-    const query = searchQuery.toLowerCase();
-    return (
-      p.firstName.toLowerCase().includes(query) ||
-      p.lastName.toLowerCase().includes(query) ||
-      p.registrationNumber.toLowerCase().includes(query) ||
-      p.mobileNumber.includes(query)
-    );
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    
+    // Split query into words and require each word to match
+    const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+    
+    // Check if all query words match in any field
+    const allWordsMatch = queryWords.every(word => {
+      return (
+        p.firstName.toLowerCase().includes(word) ||
+        p.lastName.toLowerCase().includes(word) ||
+        p.registrationNumber.toLowerCase().includes(word) ||
+        p.mobileNumber.includes(word)
+      );
+    });
+    
+    return allWordsMatch;
   });
 
   const handleSubmit = async (e: React.FormEvent) => {

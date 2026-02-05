@@ -42,10 +42,10 @@ export default function ImportPatientsPage() {
         h.includes("mobile") || h.includes("phone") || h.includes("contact")
       );
 
-      if (nameIndex === -1 || mobileIndex === -1) {
+      if (nameIndex === -1) {
         setImportResults({
           success: 0,
-          errors: ["CSV must have 'Name' and 'Mobile Number' columns"]
+          errors: ["CSV must have a 'Name' column"]
         });
         setIsImporting(false);
         return;
@@ -80,20 +80,31 @@ export default function ImportPatientsPage() {
         const nameParts = values[nameIndex]?.split(" ") || [];
         const firstName = nameParts[0] || "";
         const lastName = nameParts.slice(1).join(" ") || "";
-        const mobile = values[mobileIndex]?.replace(/["']/g, "") || "";
+        const mobile = values[mobileIndex >= 0 ? mobileIndex : nameIndex]?.replace(/["']/g, "") || ""; // Use name if mobile not found
         const regNo = regNoIndex >= 0 ? values[regNoIndex]?.replace(/["']/g, "") : "";
 
-        if (!firstName || !mobile) {
-          errors.push(`Row ${i + 1}: Missing required fields`);
+        if (!firstName) {
+          errors.push(`Row ${i + 1}: Missing required 'Name' field`);
           continue;
         }
 
-        // Check for duplicate mobile number
+        // Check for duplicate (by name or mobile if mobile provided)
         const existingPatients = patientDb.getAll() as Patient[];
-        const duplicateMobile = existingPatients.some(
-          (p: Patient) => p.mobileNumber === mobile
+        const duplicateName = existingPatients.some(
+          (p: Patient) => p.firstName.toLowerCase() === firstName.toLowerCase() && 
+                         p.lastName.toLowerCase() === lastName.toLowerCase()
         );
+        
+        // Only check mobile duplicate if mobile is provided
+        const duplicateMobile = mobile ? existingPatients.some(
+          (p: Patient) => p.mobileNumber === mobile
+        ) : false;
 
+        if (duplicateName) {
+          errors.push(`Row ${i + 1}: Patient '${firstName} ${lastName}' already exists`);
+          continue;
+        }
+        
         if (duplicateMobile) {
           errors.push(`Row ${i + 1}: Mobile number ${mobile} already exists`);
           continue;
@@ -231,7 +242,7 @@ export default function ImportPatientsPage() {
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li><strong>Registration Number</strong> (optional) - Will be auto-generated if not provided</li>
                 <li><strong>Name</strong> (required) - Patient full name</li>
-                <li><strong>Mobile Number</strong> (required) - Patient contact number</li>
+                <li><strong>Mobile Number</strong> (optional) - Patient contact number</li>
               </ul>
               <p className="mt-4">Example CSV:</p>
               <pre className="bg-gray-100 p-3 rounded text-xs mt-2 overflow-x-auto">
