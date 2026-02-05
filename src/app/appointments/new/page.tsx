@@ -39,6 +39,7 @@ export default function NewAppointmentPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewTokenNumber, setPreviewTokenNumber] = useState<number>(0);
+  const [bookedPatientIds, setBookedPatientIds] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(() => {
     const allPatients = patientDb.getAll() as Patient[];
@@ -54,6 +55,42 @@ export default function NewAppointmentPage() {
       setFormData((prev) => ({ ...prev, slotId: activeSlots[0].id }));
     }
   }, []);
+
+  // Calculate recent patients (last 10 added)
+  const recentPatients = patients
+    .filter((p) => {
+      const patient = p as Patient;
+      // Skip if already booked
+      if (bookedPatientIds.has(patient.id)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    })
+    .slice(0, 10);
+
+  // Search patients - searches ALL patients when query exists
+  const searchResults = searchQuery.trim()
+    ? patients.filter((patient) => {
+        const p = patient as { id: string; firstName: string; lastName: string; fullName: string; registrationNumber: string; mobileNumber: string };
+        // Skip if already booked
+        if (bookedPatientIds.has(p.id)) return false;
+        
+        const query = searchQuery.toLowerCase().trim();
+        return (
+          p.registrationNumber.toLowerCase().includes(query) ||
+          p.firstName.toLowerCase().includes(query) ||
+          p.lastName.toLowerCase().includes(query) ||
+          p.fullName.toLowerCase().includes(query) ||
+          p.mobileNumber.includes(query)
+        );
+      })
+    : [];
+
+  // Display patients: recent when no search, search results when searching
+  const displayPatients = searchQuery.trim() ? searchResults : recentPatients;
 
   // Calculate preview token number when date or slot changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -116,16 +153,7 @@ export default function NewAppointmentPage() {
     }
   };
 
-  const filteredPatients = patients.filter((patient) => {
-    const p = patient as { firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
-    const query = searchQuery.toLowerCase();
-    return (
-      p.firstName.toLowerCase().includes(query) ||
-      p.lastName.toLowerCase().includes(query) ||
-      p.registrationNumber.toLowerCase().includes(query) ||
-      p.mobileNumber.includes(query)
-    );
-  });
+  const filteredPatients = displayPatients;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
