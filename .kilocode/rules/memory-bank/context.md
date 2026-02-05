@@ -50,6 +50,20 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 - [x] **Tag Management UI** - Create/edit/delete custom patient tags (3.6)
 - [x] **Registration Number Settings** - Configure prefix, starting number, padding (3.2)
 
+### Module 4 - Appointment Scheduler & Queue Management (Complete)
+- [x] Appointment type definition with slots, dates, patients
+- [x] Slot configuration page (create/edit/delete time slots)
+- [x] **Token Mode Setting** - Continuous or reset daily mode
+- [x] **Patient Dropdown** - Show only 10 recently added patients in new appointment
+- [x] **Slot Filter** - Filter appointments by slot
+- [x] **Settings Index Page** - Navigation hub for Registration, Slots, Fees, Import
+- [x] Import Patients feature with CSV support
+- [x] Appointment list page with date/slot filters
+- [x] Queue management page (check-in, in-consultation, completed)
+- [x] Doctor panel for queue viewing
+- [x] Fee structure configuration (types, amounts)
+- [x] Slots persistence fix (localStorage)
+
 ## Architecture Overview (Module 1)
 
 ### Design Philosophy
@@ -60,14 +74,13 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 ### Phase-1 Features (Foundation)
 1. ✅ Dashboard - Overview and stats
 2. ✅ PMS Module - Patient management
-3. [ ] Appointment Scheduler
-3. [ ] Appointment Scheduler
-4. [ ] Queue Management
+3. ✅ Appointment Scheduler - Module 4 Complete
+4. ✅ Queue Management - Module 4 Complete
 5. [ ] Doctor Panel (Manual)
 6. [ ] Prescription Engine
 7. [ ] Pharmacy (Manual)
 8. [ ] Materia Medica (Exact text search)
-9. [ ] Fees & Billing
+9. ✅ Fees & Billing - Basic structure in Module 4
 10. [ ] Reports (Basic)
 
 ### Data Domains
@@ -121,17 +134,14 @@ src/
 
 ## Next Steps
 
-1. [ ] Build Patient Management module (add/edit/View patients)
-2. [ ] Build Appointment Scheduler
-3. [ ] Build Doctor Panel
-4. [ ] Build Queue Management
-5. [ ] Build Prescription Engine
-6. [ ] Build Pharmacy module
-7. [ ] Build Materia Medica search
-8. [ ] Build Billing & Fees
-9. [ ] Build Reports
-10. [ ] Add SQLite database for persistence
-11. [ ] Add data export/backup
+1. [ ] **Complete Appointment Scheduler** - Module 4 in progress
+2. [ ] Build Doctor Panel (Manual)
+3. [ ] Build Prescription Engine
+4. [ ] Build Pharmacy module
+5. [ ] Build Materia Medica search
+6. [ ] Build Reports
+7. [ ] Add SQLite database for persistence
+8. [ ] Add data export/backup
 
 ## Quick Start Guide
 
@@ -160,6 +170,9 @@ bun start
 | 2026-02-02 | Initial setup, verified build, updated architecture for PMS |
 | 2026-02-02 | Created modular structure, types, database, UI components, dashboard |
 | 2026-02-02 | Module 2: User roles, permissions, login, activity log, messaging |
+| 2026-02-03 | Module 4: Appointment Scheduler, Queue, Fee structure |
+| 2026-02-04 | Module 4: Token mode, slot filter, patient dropdown, settings index |
+| 2026-02-05 | Fix lint errors for setState in useEffect hooks |
 
 ## Key Architecture Rules (from Module 1)
 
