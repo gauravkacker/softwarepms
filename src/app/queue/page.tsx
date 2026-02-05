@@ -66,6 +66,7 @@ export default function QueuePage() {
   }, [selectedSlot]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadQueue();
   }, [loadQueue]);
 

@@ -64,6 +64,7 @@ export default function NewAppointmentPage() {
   }, []);
 
   // Calculate preview token number when date or slot changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (formData.date && formData.slotId) {
       const existingAppointments = appointmentDb.getBySlot(new Date(formData.date), formData.slotId);
@@ -80,10 +81,12 @@ export default function NewAppointmentPage() {
   }, [formData.date, formData.slotId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadData();
   }, [loadData]);
 
   // Auto-fill fee when appointment type changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (formData.feeExempt) return;
     

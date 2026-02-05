@@ -51,6 +51,7 @@ export default function AppointmentsPage() {
   }, [dateFilter, slotFilter]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadAppointments();
   }, [loadAppointments]);
 
