@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { appointmentDb, patientDb, slotDb, feeHistoryDb, feeDb } from "@/lib/db/database";
-import type { Appointment, Patient, Slot, FeeType } from "@/types";
+import type { Appointment, Patient, Slot, FeeType, FeeHistoryEntry } from "@/types";
 
 export default function NewAppointmentPage() {
   const router = useRouter();
@@ -40,6 +40,11 @@ export default function NewAppointmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewTokenNumber, setPreviewTokenNumber] = useState<number>(0);
   const [bookedPatientIds, setBookedPatientIds] = useState<Set<string>>(new Set());
+  const [lastFeeInfo, setLastFeeInfo] = useState<{
+    date: string;
+    amount: number;
+    daysAgo: number;
+  } | null>(null);
 
   const loadData = useCallback(() => {
     const allPatients = patientDb.getAll() as Patient[];
@@ -152,6 +157,29 @@ export default function NewAppointmentPage() {
       }));
     }
   };
+
+  // Fetch last fee info when patient is selected
+  useEffect(() => {
+    if (selectedPatient) {
+      const lastFee = feeHistoryDb.getLastByPatient(selectedPatient.id) as FeeHistoryEntry | null;
+      if (lastFee) {
+        const paidDate = new Date(lastFee.paidDate);
+        const today = new Date();
+        const diffTime = Math.abs(today.getTime() - paidDate.getTime());
+        const daysAgo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        setLastFeeInfo({
+          date: paidDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          amount: lastFee.amount,
+          daysAgo: daysAgo,
+        });
+      } else {
+        setLastFeeInfo(null);
+      }
+    } else {
+      setLastFeeInfo(null);
+    }
+  }, [selectedPatient]);
 
   const filteredPatients = displayPatients;
 
@@ -328,22 +356,45 @@ export default function NewAppointmentPage() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {(selectedPatient as { firstName: string }).firstName} {(selectedPatient as { lastName: string }).lastName}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {(selectedPatient as { firstName: string }).firstName} {(selectedPatient as { lastName: string }).lastName}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {(selectedPatient as { registrationNumber: string }).registrationNumber}
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {(selectedPatient as { registrationNumber: string }).registrationNumber}
-                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setSelectedPatient(null)}
+                    >
+                      Change
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setSelectedPatient(null)}
-                  >
-                    Change
-                  </Button>
+                  
+                  {/* Last Fee Info */}
+                  {lastFeeInfo ? (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="font-medium">Last fee paid: {lastFeeInfo.date} - {lastFeeInfo.amount} Rs - {lastFeeInfo.daysAgo} days ago</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm">No payment history found</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>

@@ -217,27 +217,51 @@ class LocalDatabase {
   }
 
   // Module 3: Registration Number Generation
-  private regNumberCounter: number = 1000;
-  private regNumberSettings: RegNumberSettings = {
-    prefix: '',
-    startingNumber: 1001,
-    padding: 4,
-    separator: '',
-  };
-
-  public initRegNumberSettings(settings: RegNumberSettings): void {
-    this.regNumberSettings = settings;
-    this.regNumberCounter = settings.startingNumber;
-  }
-
-  public generateRegNumber(): string {
-    const number = this.regNumberCounter++;
-    const paddedNumber = number.toString().padStart(this.regNumberSettings.padding, '0');
-    return `${this.regNumberSettings.prefix}${paddedNumber}`;
-  }
-
+  // Formula: nextRegNumber = settings.startingNumber + totalPatientsCount
   public getRegNumberSettings(): RegNumberSettings {
-    return { ...this.regNumberSettings };
+    // Get settings from localStorage via settingsDb
+    let settings = {
+      prefix: 'DK-',
+      startingNumber: 1001,
+      padding: 4,
+      separator: '-',
+    };
+    
+    // Try to load settings from database if available
+    if (typeof window !== 'undefined') {
+      try {
+        const savedData = localStorage.getItem('pms_database');
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          const settingsData = parsed['settings'];
+          if (settingsData && Array.isArray(settingsData)) {
+            const regSettings = settingsData.find((s: { id: string }) => s.id === 'registration');
+            if (regSettings) {
+              settings = {
+                prefix: regSettings.prefix || 'DK-',
+                startingNumber: regSettings.startingNumber || 1001,
+                padding: regSettings.padding || 4,
+                separator: regSettings.separator || '-',
+              };
+            }
+          }
+        }
+      } catch (e) {
+        // Use default settings
+      }
+    }
+    
+    return settings;
+  }
+  public generateRegNumber(): string {
+    // Get settings
+    const settings = this.getRegNumberSettings();
+    
+    // Calculate next number: startingNumber + total patients count
+    const totalPatients = this.getAll('patients').length;
+    const nextNumber = settings.startingNumber + totalPatients;
+    const paddedNumber = nextNumber.toString().padStart(settings.padding, '0');
+    return `${settings.prefix}${paddedNumber}`;
   }
 
   // Module 3: Duplicate Detection
@@ -278,14 +302,6 @@ export const db = LocalDatabase.getInstance();
 
 // Seed initial data for testing (Module 3)
 export function seedInitialData(): void {
-  // Initialize registration number settings
-  db.initRegNumberSettings({
-    prefix: 'DK-',
-    startingNumber: 1001,
-    padding: 4,
-    separator: '-',
-  });
-
   // Seed default patient tags
   const defaultTags = [
     { id: 'tag-diabetic', name: 'Diabetic', color: '#ef4444', description: 'Diabetic patient', isSystem: true },
