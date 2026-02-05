@@ -64,6 +64,9 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 - [x] Fee structure configuration (types, amounts)
 - [x] Slots persistence fix (localStorage)
 - [x] **Schema Version Fix** - Set SCHEMA_VERSION to enable localStorage data loading
+- [x] **Import Duplicate Check** - Check only registration numbers, allow same family mobile
+- [x] **Delete All Button** - Permanently delete all patients from patients page
+- [x] **Multi-Select Delete** - Select and delete multiple patients at once
 
 ## Architecture Overview (Module 1)
 
@@ -173,7 +176,7 @@ bun start
 | 2026-02-02 | Module 2: User roles, permissions, login, activity log, messaging |
 | 2026-02-03 | Module 4: Appointment Scheduler, Queue, Fee structure |
 | 2026-02-04 | Module 4: Token mode, slot filter, patient dropdown, settings index |
-| 2026-02-05 | Fix lint errors for setState in useEffect hooks |
+| 2026-02-05 | Import duplicate check (reg only), Delete All button, multi-select delete |
 | 2026-02-05 | Fix appointment booking to search all patients (not just recent) |
 | 2026-02-05 | Fix SCHEMA_VERSION to enable localStorage data loading |
 
