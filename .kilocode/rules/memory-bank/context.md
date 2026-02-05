@@ -63,6 +63,7 @@ Building a modular, offline-first Practice Management System for homeopathic cli
 - [x] Doctor panel for queue viewing
 - [x] Fee structure configuration (types, amounts)
 - [x] Slots persistence fix (localStorage)
+- [x] **Schema Version Fix** - Set SCHEMA_VERSION to enable localStorage data loading
 
 ## Architecture Overview (Module 1)
 
@@ -174,6 +175,7 @@ bun start
 | 2026-02-04 | Module 4: Token mode, slot filter, patient dropdown, settings index |
 | 2026-02-05 | Fix lint errors for setState in useEffect hooks |
 | 2026-02-05 | Fix appointment booking to search all patients (not just recent) |
+| 2026-02-05 | Fix SCHEMA_VERSION to enable localStorage data loading |
 
 ## Key Architecture Rules (from Module 1)
 
