@@ -165,14 +165,28 @@ export default function NewAppointmentPage() {
       if (lastFee) {
         const paidDate = new Date(lastFee.paidDate);
         const today = new Date();
-        const diffTime = Math.abs(today.getTime() - paidDate.getTime());
-        const daysAgo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
-        setLastFeeInfo({
-          date: paidDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-          amount: lastFee.amount,
-          daysAgo: daysAgo,
-        });
+        // Check if same day
+        const isSameDay = 
+          paidDate.getDate() === today.getDate() &&
+          paidDate.getMonth() === today.getMonth() &&
+          paidDate.getFullYear() === today.getFullYear();
+        
+        if (isSameDay) {
+          setLastFeeInfo({
+            date: paidDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            amount: lastFee.amount,
+            daysAgo: 0, // 0 means today
+          });
+        } else {
+          const diffTime = Math.abs(today.getTime() - paidDate.getTime());
+          const daysAgo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          setLastFeeInfo({
+            date: paidDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            amount: lastFee.amount,
+            daysAgo: daysAgo,
+          });
+        }
       } else {
         setLastFeeInfo(null);
       }
@@ -382,7 +396,12 @@ export default function NewAppointmentPage() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="font-medium">Last fee paid: {lastFeeInfo.date} - {lastFeeInfo.amount} Rs - {lastFeeInfo.daysAgo} days ago</span>
+                        <span className="font-medium">
+                          {lastFeeInfo.daysAgo === 0 
+                            ? `Fee paid today: ${lastFeeInfo.amount} Rs`
+                            : `Last fee paid: ${lastFeeInfo.date} - ${lastFeeInfo.amount} Rs - ${lastFeeInfo.daysAgo} day${lastFeeInfo.daysAgo === 1 ? '' : 's'} ago`
+                          }
+                        </span>
                       </div>
                     </div>
                   ) : (

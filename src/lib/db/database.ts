@@ -217,7 +217,7 @@ class LocalDatabase {
   }
 
   // Module 3: Registration Number Generation
-  // Formula: nextRegNumber = settings.startingNumber + totalPatientsCount
+  // Formula: nextRegNumber = max(settings.startingNumber, highest existing number + 1)
   public getRegNumberSettings(): RegNumberSettings {
     // Get settings from localStorage via settingsDb
     let settings = {
@@ -253,13 +253,38 @@ class LocalDatabase {
     
     return settings;
   }
+
+  private extractRegNumberParts(regNumber: string): { prefix: string; number: number } | null {
+    // Try to extract the numeric part from a registration number
+    // Examples: "DK-1001" -> { prefix: "DK-", number: 1001 }
+    // Examples: "1928" -> { prefix: "", number: 1928 }
+    const match = regNumber.match(/^(.*?)(\d+)$/);
+    if (match) {
+      return {
+        prefix: match[1],
+        number: parseInt(match[2], 10),
+      };
+    }
+    return null;
+  }
+
   public generateRegNumber(): string {
-    // Get settings
     const settings = this.getRegNumberSettings();
     
-    // Calculate next number: startingNumber + total patients count
-    const totalPatients = this.getAll('patients').length;
-    const nextNumber = settings.startingNumber + totalPatients;
+    // Get all existing patients and find the highest registration number
+    const patients = this.getAll('patients');
+    let highestNumber = 0;
+    
+    patients.forEach((patient: unknown) => {
+      const p = patient as { registrationNumber: string };
+      const parts = this.extractRegNumberParts(p.registrationNumber);
+      if (parts && parts.number > highestNumber) {
+        highestNumber = parts.number;
+      }
+    });
+    
+    // Calculate next number: max of startingNumber and highest existing + 1
+    const nextNumber = Math.max(settings.startingNumber, highestNumber + 1);
     const paddedNumber = nextNumber.toString().padStart(settings.padding, '0');
     return `${settings.prefix}${paddedNumber}`;
   }
