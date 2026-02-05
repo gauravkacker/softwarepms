@@ -16,7 +16,7 @@ const dbConfig: DatabaseConfig = {
 
 // Database schema version - increment to reset data after schema changes
 // NOTE: Set to empty string to preserve data between sessions
-const SCHEMA_VERSION = '';
+const SCHEMA_VERSION = '1.0';
 
 // LocalStorage-persisted database for offline-first functionality
 class LocalDatabase {
