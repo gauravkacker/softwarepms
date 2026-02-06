@@ -97,6 +97,110 @@ export default function DoctorPanelPage() {
   const [combinationContent, setCombinationContent] = useState('');
   const [editingCombinationIndex, setEditingCombinationIndex] = useState<number | null>(null);
   
+  // Medicine autocomplete
+  const [medicineSearchQuery, setMedicineSearchQuery] = useState('');
+  const [medicineSuggestions, setMedicineSuggestions] = useState<string[]>([]);
+  const [showMedicineSuggestions, setShowMedicineSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  
+  // Common homeopathic medicines for autocomplete
+  const commonMedicines = [
+    'Aconitum napellus', 'Arsenicum album', 'Belladonna', 'Bryonia alba', 'Calcarea carbonica',
+    'Chamomilla', 'China officinalis', 'Coffea cruda', 'Dulcamara', 'Ferrum phosphoricum',
+    'Gelsemium', 'Hepar sulphuris', 'Ignatia amara', 'Ipecacuanha', 'Kali bichromicum',
+    'Lachesis', 'Lycopodium', 'Mercurius solubilis', 'Natrum muriaticum', 'Nux vomica',
+    'Phosphorus', 'Pulsatilla', 'Rhus toxicodendron', 'Sepia', 'Silicea',
+    'Sulphur', 'Thuja occidentalis', 'Arnica montana', 'Hypericum', 'Ruta graveolens',
+    'Aesculus hippocastanum', 'Aloe socotrina', 'Antimonium crudum', 'Apis mellifica', 'Argentum nitricum',
+    'Aurum metallicum', 'Baryta carbonica', 'Berberis vulgaris', 'Borax', 'Cactus grandiflorus',
+    'Calcarea phosphorica', 'Cantharis', 'Carbo vegetabilis', 'Causticum', 'Cimicifuga',
+    'Coccus cacti', 'Colocynthis', 'Conium maculatum', 'Cornus circinata', 'Crotalus horribilis',
+    'Cuprum metallicum', 'Digitalis', 'Drosera', 'Echinacea', 'Eupatorium perforliatum',
+    'Euphrasia', 'Graphites', 'Hamamelis', 'Hydrastis', 'Hypericum perfoliatum',
+    'Kali carbonicum', 'Kali phosphoricum', 'Kreosotum', 'Lac caninum', 'Lobelia',
+    'Magnesia phosphorica', 'Medorrhinum', 'Murex purpureus', 'Nitricum acidum', 'Oleander',
+    'Oxalic acid', 'Petroleum', 'Phosphoricum acidum', 'Phytolacca', 'Platina',
+    'Podophyllum', 'Psorinum', 'Pyrogenium', 'Ranunculus bulbosus', 'Raphanus',
+    'Rumex crispus', 'Sabadilla', 'Sambucus nigra', 'Sanicula', 'Sarsaparilla',
+    'Secale cornutum', 'Selenium', 'Spongia', 'Stannum metallicum', 'Staphysagria',
+    'Stramonium', 'Sulphuricum acidum', 'Tabacum', 'Tarantula', 'Tellurium',
+    'Theridion', 'Thlaspi', 'Tuberculinum', 'Veratrum album', 'Verbascum',
+    'Viola odorata', 'Vipera', 'Zincum metallicum', 'Zingiber'
+  ];
+  
+  // System memory for medicine patterns
+  const MEDICINE_MEMORY_KEY = 'homeo_prescription_memory';
+  
+  interface MedicineMemory {
+    medicine: string;
+    potency?: string;
+    quantity: string;
+    doseForm: string;
+    dosePattern: string;
+    frequency: string;
+    duration: string;
+    usageCount: number;
+    lastUsed: Date;
+  }
+  
+  const getMedicineMemory = (): Record<string, MedicineMemory> => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const data = localStorage.getItem(MEDICINE_MEMORY_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch {
+      return {};
+    }
+  };
+  
+  const saveMedicineToMemory = (medicine: string, potency: string, pattern: Prescription) => {
+    if (typeof window === 'undefined' || !medicine.trim()) return;
+    
+    const memory = getMedicineMemory();
+    const key = `${medicine.toLowerCase()}_${potency || ''}`;
+    
+    memory[key] = {
+      medicine: medicine,
+      potency: potency || '',
+      quantity: pattern.quantity || '1dr',
+      doseForm: pattern.doseForm || 'pills',
+      dosePattern: pattern.dosePattern || '1-1-1',
+      frequency: pattern.frequency || 'Daily',
+      duration: pattern.duration || '7 days',
+      usageCount: (memory[key]?.usageCount || 0) + 1,
+      lastUsed: new Date()
+    };
+    
+    localStorage.setItem(MEDICINE_MEMORY_KEY, JSON.stringify(memory));
+  };
+  
+  const getMedicinePattern = (medicine: string, potency: string): Prescription | null => {
+    const memory = getMedicineMemory();
+    const key = `${medicine.toLowerCase()}_${potency || ''}`;
+    return memory[key] || null;
+  };
+  
+  // Load saved pattern when medicine/potency changes
+  const loadSavedPattern = (index: number, medicine: string, potency: string) => {
+    if (!medicine.trim()) return;
+    
+    const pattern = getMedicinePattern(medicine, potency);
+    if (pattern) {
+      setPrescriptions(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          quantity: pattern.quantity,
+          doseForm: pattern.doseForm,
+          dosePattern: pattern.dosePattern,
+          frequency: pattern.frequency,
+          duration: pattern.duration,
+        };
+        return updated;
+      });
+    }
+  };
+  
   // Modal states
   const [showEndConsultationModal, setShowEndConsultationModal] = useState(false);
   const [showSameDayReopenModal, setShowSameDayReopenModal] = useState(false);
@@ -326,7 +430,114 @@ export default function DoctorPanelPage() {
     return rx;
   };
 
-  // ===== COMBINATION MEDICINES =====
+  // ===== MEDICINE AUTOCOMPLETE =====
+  
+  const handleMedicineSearchChange = (index: number, value: string) => {
+    setMedicineSearchQuery(value);
+    updatePrescriptionRow(index, 'medicine', value);
+    
+    if (value.trim().length > 0) {
+      const filtered = commonMedicines.filter(med => 
+        med.toLowerCase().includes(value.toLowerCase())
+      );
+      setMedicineSuggestions(filtered.slice(0, 10)); // Show max 10 suggestions
+      setShowMedicineSuggestions(true);
+      setSelectedSuggestionIndex(-1);
+    } else {
+      setMedicineSuggestions([]);
+      setShowMedicineSuggestions(false);
+    }
+  };
+  
+  const handleMedicineKeyDown = (
+    e: React.KeyboardEvent,
+    index: number,
+    totalRows: number
+  ) => {
+    if (!showMedicineSuggestions) {
+      // Handle Tab/Enter for navigation when suggestions are hidden
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        // Save pattern to memory when Enter is pressed
+        const rx = prescriptions[index];
+        if (rx.medicine.trim()) {
+          saveMedicineToMemory(rx.medicine, rx.potency || '', rx);
+        }
+        // Add new row if on last row
+        if (index === totalRows - 1) {
+          addEmptyPrescriptionRow();
+        }
+      }
+      return;
+    }
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < medicineSuggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
+          selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
+        } else if (prescriptions[index].medicine.trim()) {
+          // Save to memory if no suggestion selected
+          const rx = prescriptions[index];
+          saveMedicineToMemory(rx.medicine, rx.potency || '', rx);
+        }
+        // Add new row if on last row
+        if (index === totalRows - 1) {
+          addEmptyPrescriptionRow();
+        }
+        break;
+      case 'Tab':
+        if (selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
+          e.preventDefault();
+          selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case 'Escape':
+        setShowMedicineSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  };
+  
+  const selectMedicine = (index: number, medicine: string) => {
+    updatePrescriptionRow(index, 'medicine', medicine);
+    setShowMedicineSuggestions(false);
+    setMedicineSuggestions([]);
+    setSelectedSuggestionIndex(-1);
+    setMedicineSearchQuery('');
+    
+    // Try to load saved pattern for this medicine
+    loadSavedPattern(index, medicine, '');
+  };
+  
+  const handlePotencyKeyDown = (
+    e: React.KeyboardEvent,
+    index: number,
+    totalRows: number
+  ) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const rx = prescriptions[index];
+      if (rx.medicine.trim() && rx.potency) {
+        saveMedicineToMemory(rx.medicine, rx.potency, rx);
+        loadSavedPattern(index, rx.medicine, rx.potency);
+      }
+      // Add new row if on last row
+      if (index === totalRows - 1) {
+        addEmptyPrescriptionRow();
+      }
+    }
+  };
 
   const handleOpenCombination = (index: number) => {
     setEditingCombinationIndex(index);
@@ -593,30 +804,77 @@ export default function DoctorPanelPage() {
                           <th className="pb-3 font-medium">Medicine</th>
                           <th className="pb-3 font-medium w-20">Potency</th>
                           <th className="pb-3 font-medium w-24">Quantity</th>
+                          <th className="pb-3 font-medium w-24">Dose Form</th>
                           <th className="pb-3 font-medium w-24">Pattern</th>
                           <th className="pb-3 font-medium w-24">Frequency</th>
                           <th className="pb-3 font-medium w-28">Duration</th>
-                          <th className="pb-3 font-medium w-16">Qty</th>
+                          <th className="pb-3 font-medium w-16">Bottles</th>
                           <th className="pb-3 font-medium w-16"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {prescriptions.map((rx, index) => (
                           <tr key={index} className="border-b border-gray-50">
-                            <td className="py-2">
-                              <input
-                                type="text"
-                                value={rx.medicine}
-                                onChange={(e) => updatePrescriptionRow(index, 'medicine', e.target.value)}
-                                placeholder="Medicine name"
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                              />
+                            <td className="py-2 relative">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={rx.medicine}
+                                  onChange={(e) => handleMedicineSearchChange(index, e.target.value)}
+                                  onKeyDown={(e) => handleMedicineKeyDown(e, index, prescriptions.length)}
+                                  onFocus={() => {
+                                    if (rx.medicine.trim().length > 0) {
+                                      const filtered = commonMedicines.filter(med => 
+                                        med.toLowerCase().includes(rx.medicine.toLowerCase())
+                                      );
+                                      setMedicineSuggestions(filtered.slice(0, 10));
+                                      setShowMedicineSuggestions(true);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    // Delay hiding to allow click on suggestion
+                                    setTimeout(() => {
+                                      setShowMedicineSuggestions(false);
+                                    }, 200);
+                                  }}
+                                  placeholder="Medicine name"
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  autoComplete="off"
+                                />
+                                
+                                {/* Autocomplete Dropdown */}
+                                {showMedicineSuggestions && medicineSuggestions.length > 0 && (
+                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
+                                    {medicineSuggestions.map((suggestion, i) => (
+                                      <button
+                                        key={i}
+                                        onClick={() => selectMedicine(index, suggestion)}
+                                        className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
+                                          i === selectedSuggestionIndex ? 'bg-blue-50 text-blue-700' : ''
+                                        }`}
+                                      >
+                                        {suggestion}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              {/* Combination indicator */}
+                              {rx.isCombination && (
+                                <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                  </svg>
+                                  {rx.combinationName}
+                                </div>
+                              )}
                             </td>
                             <td className="py-2">
                               <input
                                 type="text"
                                 value={rx.potency || ''}
                                 onChange={(e) => updatePrescriptionRow(index, 'potency', e.target.value)}
+                                onKeyDown={(e) => handlePotencyKeyDown(e, index, prescriptions.length)}
                                 placeholder="200"
                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                               />
@@ -628,6 +886,20 @@ export default function DoctorPanelPage() {
                                 onChange={(e) => updatePrescriptionRow(index, 'quantity', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                               />
+                            </td>
+                            <td className="py-2">
+                              <select
+                                value={rx.doseForm || 'pills'}
+                                onChange={(e) => updatePrescriptionRow(index, 'doseForm', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="pills">Pills</option>
+                                <option value="drops">Drops</option>
+                                <option value="tablets">Tablets</option>
+                                <option value="liquid">Liquid</option>
+                                <option value="ointment">Ointment</option>
+                                <option value="powder">Powder</option>
+                              </select>
                             </td>
                             <td className="py-2">
                               <input
