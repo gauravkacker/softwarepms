@@ -130,6 +130,7 @@ export default function DoctorPanelPage() {
   
   // System memory for medicine patterns
   const MEDICINE_MEMORY_KEY = 'homeo_prescription_memory';
+  const CUSTOM_MEDICINES_KEY = 'homeo_custom_medicines';
   
   interface MedicineMemory {
     medicine: string;
@@ -143,6 +144,41 @@ export default function DoctorPanelPage() {
     lastUsed: Date;
   }
   
+  // Get saved custom medicines (entered by user)
+  const getCustomMedicines = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(CUSTOM_MEDICINES_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  };
+  
+  // Save a custom medicine entered by user
+  const saveCustomMedicine = (medicine: string) => {
+    if (typeof window === 'undefined' || !medicine.trim()) return;
+    const customMeds = getCustomMedicines();
+    const lowerMed = medicine.toLowerCase().trim();
+    if (!customMeds.some(m => m.toLowerCase() === lowerMed)) {
+      customMeds.push(medicine.trim());
+      localStorage.setItem(CUSTOM_MEDICINES_KEY, JSON.stringify(customMeds));
+    }
+  };
+  
+  // Get all medicines for autocomplete (common + custom)
+  const getAllMedicinesForAutocomplete = (query: string): string[] => {
+    const customMeds = getCustomMedicines();
+    const filteredCustom = customMeds.filter(m => 
+      m.toLowerCase().includes(query.toLowerCase())
+    );
+    const filteredCommon = commonMedicines.filter(m => 
+      m.toLowerCase().includes(query.toLowerCase())
+    );
+    // Combine, prioritize custom medicines
+    return [...new Set([...filteredCustom, ...filteredCommon])].slice(0, 10);
+  };
+  
   const getMedicineMemory = (): Record<string, MedicineMemory> => {
     if (typeof window === 'undefined') return {};
     try {
@@ -155,6 +191,9 @@ export default function DoctorPanelPage() {
   
   const saveMedicineToMemory = (medicine: string, potency: string, pattern: Prescription) => {
     if (typeof window === 'undefined' || !medicine.trim()) return;
+    
+    // Save medicine to custom list
+    saveCustomMedicine(medicine);
     
     const memory = getMedicineMemory();
     const key = `${medicine.toLowerCase()}_${potency || ''}`;
@@ -437,10 +476,9 @@ export default function DoctorPanelPage() {
     updatePrescriptionRow(index, 'medicine', value);
     
     if (value.trim().length > 0) {
-      const filtered = commonMedicines.filter(med => 
-        med.toLowerCase().includes(value.toLowerCase())
-      );
-      setMedicineSuggestions(filtered.slice(0, 10)); // Show max 10 suggestions
+      // Use all medicines (common + custom) for autocomplete
+      const suggestions = getAllMedicinesForAutocomplete(value);
+      setMedicineSuggestions(suggestions);
       setShowMedicineSuggestions(true);
       setSelectedSuggestionIndex(-1);
     } else {
@@ -541,7 +579,7 @@ export default function DoctorPanelPage() {
 
   const handleOpenCombination = (index: number) => {
     setEditingCombinationIndex(index);
-    setCombinationName(prescriptions[index].combinationName || '');
+    setCombinationName(prescriptions[index].combinationName || prescriptions[index].medicine || '');
     setCombinationContent(prescriptions[index].combinationContent || '');
     setShowCombinationModal(true);
   };
@@ -564,6 +602,20 @@ export default function DoctorPanelPage() {
     setEditingCombinationIndex(null);
     setCombinationName('');
     setCombinationContent('');
+  };
+  
+  // ===== SMART PARSING =====
+  
+  const handleSmartParse = (index: number) => {
+    const rx = prescriptions[index];
+    if (rx.medicine.trim()) {
+      const parsed = parseSmartEntry(rx.medicine);
+      setPrescriptions(prev => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], ...parsed };
+        return updated;
+      });
+    }
   };
 
   // ===== END CONSULTATION =====
@@ -824,10 +876,8 @@ export default function DoctorPanelPage() {
                                   onKeyDown={(e) => handleMedicineKeyDown(e, index, prescriptions.length)}
                                   onFocus={() => {
                                     if (rx.medicine.trim().length > 0) {
-                                      const filtered = commonMedicines.filter(med => 
-                                        med.toLowerCase().includes(rx.medicine.toLowerCase())
-                                      );
-                                      setMedicineSuggestions(filtered.slice(0, 10));
+                                      const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
+                                      setMedicineSuggestions(suggestions);
                                       setShowMedicineSuggestions(true);
                                     }
                                   }}
@@ -858,6 +908,23 @@ export default function DoctorPanelPage() {
                                     ))}
                                   </div>
                                 )}
+                              </div>
+                              {/* Medicine action buttons */}
+                              <div className="flex gap-1 mt-1">
+                                <button
+                                  onClick={() => handleOpenCombination(index)}
+                                  className="text-xs px-2 py-0.5 bg-purple-50 text-purple-600 rounded hover:bg-purple-100"
+                                  title="Create Combination"
+                                >
+                                  + Combo
+                                </button>
+                                <button
+                                  onClick={() => handleSmartParse(index)}
+                                  className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded hover:bg-green-100"
+                                  title="Smart Parse"
+                                >
+                                  Smart
+                                </button>
                               </div>
                               {/* Combination indicator */}
                               {rx.isCombination && (
