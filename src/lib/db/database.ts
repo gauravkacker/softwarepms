@@ -221,7 +221,7 @@ class LocalDatabase {
   public getRegNumberSettings(): RegNumberSettings {
     // Get settings from localStorage via settingsDb
     let settings = {
-      prefix: 'DK-',
+      prefix: '',
       startingNumber: 1001,
       padding: 4,
       separator: '-',
@@ -238,7 +238,7 @@ class LocalDatabase {
             const regSettings = settingsData.find((s: { id: string }) => s.id === 'registration');
             if (regSettings) {
               settings = {
-                prefix: regSettings.prefix || 'DK-',
+                prefix: regSettings.prefix !== undefined ? regSettings.prefix : '',
                 startingNumber: regSettings.startingNumber || 1001,
                 padding: regSettings.padding || 4,
                 separator: regSettings.separator || '-',

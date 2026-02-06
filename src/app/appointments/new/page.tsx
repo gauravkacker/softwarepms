@@ -116,6 +116,24 @@ export default function NewAppointmentPage() {
     loadData();
   }, [loadData]);
 
+  // Handle URL params for patient auto-selection (from "Register & Book Appointment")
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const patientId = params.get('patientId');
+      
+      if (patientId && patients.length > 0) {
+        // Find and select the patient
+        const patient = patientDb.getById(patientId) as Patient | undefined;
+        if (patient) {
+          setSelectedPatient(patient);
+          // Clear URL params to clean up
+          window.history.replaceState({}, '', '/appointments/new');
+        }
+      }
+    }
+  }, [patients]); // Re-run when patients loaded to ensure we have the data
+
   // Auto-fill fee when appointment type changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {

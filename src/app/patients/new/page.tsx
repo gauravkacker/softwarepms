@@ -143,27 +143,60 @@ export default function NewPatientPage() {
   };
 
   const checkForDuplicates = () => {
-    const name = `${formData.firstName} ${formData.lastName}`.trim();
+    const firstName = formData.firstName.trim().toLowerCase();
+    const lastName = formData.lastName.trim().toLowerCase();
     const mobile = formData.mobileNumber.trim();
     
-    if (!name && !mobile) {
+    // Need at least first name and mobile to check for duplicates
+    if (!firstName || !mobile) {
       setShowDuplicateWarning(false);
       setDuplicatePatients([]);
       return;
     }
 
-    const duplicates = patientDb.findDuplicates(name, mobile);
+    const allPatients = patientDb.getAll() as Patient[];
+    const duplicates: Array<{
+      id: string;
+      registrationNumber: string;
+      fullName: string;
+      mobileNumber: string;
+    }> = [];
+    
+    allPatients.forEach((patient) => {
+      const pFirstName = (patient.firstName || '').trim().toLowerCase();
+      const pLastName = (patient.lastName || '').trim().toLowerCase();
+      const pMobile = (patient.mobileNumber || '').trim();
+      
+      // Check 1: Exact match on firstName + lastName + mobile (all 3 must match)
+      const exactNameMatch = firstName === pFirstName && lastName === pLastName;
+      const mobileMatch = mobile === pMobile;
+      
+      if (exactNameMatch && mobileMatch) {
+        // Exact duplicate - same name and same mobile
+        duplicates.push({
+          id: patient.id,
+          registrationNumber: patient.registrationNumber,
+          fullName: patient.fullName,
+          mobileNumber: patient.mobileNumber,
+        });
+      }
+      
+      // Check 2: Show all patients with same mobile number (for reference)
+      if (mobileMatch && pMobile) {
+        // Add to duplicates if not already added
+        if (!duplicates.find(d => d.id === patient.id)) {
+          duplicates.push({
+            id: patient.id,
+            registrationNumber: patient.registrationNumber,
+            fullName: patient.fullName,
+            mobileNumber: patient.mobileNumber,
+          });
+        }
+      }
+    });
+    
     if (duplicates.length > 0) {
-      const duplicateData = duplicates.map((id) => {
-        const patient = patientDb.getById(id) as Patient | undefined;
-        return {
-          id,
-          registrationNumber: patient?.registrationNumber || "",
-          fullName: patient?.fullName || "",
-          mobileNumber: patient?.mobileNumber || "",
-        };
-      });
-      setDuplicatePatients(duplicateData);
+      setDuplicatePatients(duplicates);
       setShowDuplicateWarning(true);
     } else {
       setShowDuplicateWarning(false);
