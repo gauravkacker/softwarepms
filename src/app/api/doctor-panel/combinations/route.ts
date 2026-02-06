@@ -1,77 +1,109 @@
+// ============================================
+// Combinations API Route
+// Doctor Panel - Combination Medicines Management
+// ============================================
+
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db/database';
-import { combinations } from '@/lib/db/schema';
-import { eq, asc } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { combinationDb } from '@/lib/db/doctor-panel';
+import type { CombinationMedicine } from '@/lib/db/schema';
 
-// GET - Fetch all combinations
-export async function GET() {
+// GET - Retrieve combinations
+export async function GET(request: NextRequest) {
   try {
-    const allCombinations = await db.select()
-      .from(combinations)
-      .orderBy(asc(combinations.name));
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const search = searchParams.get('search');
 
-    return NextResponse.json(allCombinations);
+    if (id) {
+      const combination = combinationDb.getById(id);
+      if (!combination) {
+        return NextResponse.json({ error: 'Combination not found' }, { status: 404 });
+      }
+      return NextResponse.json(combination);
+    }
+
+    if (search) {
+      const combinations = combinationDb.search(search);
+      return NextResponse.json(combinations);
+    }
+
+    const combinations = combinationDb.getAll();
+    return NextResponse.json(combinations);
   } catch (error) {
     console.error('Error fetching combinations:', error);
     return NextResponse.json({ error: 'Failed to fetch combinations' }, { status: 500 });
   }
 }
 
-// POST - Create or update combination
+// POST - Create new combination
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, content, showComposition } = body;
-
-    // Check if combination exists
-    const existing = await db.select()
-      .from(combinations)
-      .where(eq(combinations.name, name))
-      .limit(1);
-
-    if (existing[0]) {
-      // Update existing
-      await db.update(combinations)
-        .set({
-          content,
-          showComposition: showComposition !== undefined ? showComposition : true,
-          updatedAt: new Date(),
-        })
-        .where(eq(combinations.id, existing[0].id));
-
-      return NextResponse.json({ success: true, id: existing[0].id, action: 'updated' });
+    
+    // Check if name already exists
+    const existing = combinationDb.getByName(body.name);
+    if (existing) {
+      return NextResponse.json({ error: 'Combination with this name already exists' }, { status: 400 });
     }
 
-    // Create new
-    const newId = id || uuidv4();
-    await db.insert(combinations).values({
-      id: newId,
-      name,
-      content,
-      showComposition: showComposition !== undefined ? showComposition : true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const newCombination = combinationDb.create({
+      name: body.name,
+      content: body.content,
+      showComposition: body.showComposition !== false,
     });
 
-    return NextResponse.json({ success: true, id: newId, action: 'created' });
+    return NextResponse.json(newCombination, { status: 201 });
   } catch (error) {
-    console.error('Error saving combination:', error);
-    return NextResponse.json({ error: 'Failed to save combination' }, { status: 500 });
+    console.error('Error creating combination:', error);
+    return NextResponse.json({ error: 'Failed to create combination' }, { status: 500 });
+  }
+}
+
+// PUT - Update combination
+export async function PUT(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const updates: Partial<CombinationMedicine> = {};
+    
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.content !== undefined) updates.content = body.content;
+    if (body.showComposition !== undefined) updates.showComposition = body.showComposition;
+
+    const updated = combinationDb.update(id, updates);
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Combination not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Error updating combination:', error);
+    return NextResponse.json({ error: 'Failed to update combination' }, { status: 500 });
   }
 }
 
 // DELETE - Delete combination
 export async function DELETE(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
     if (!id) {
-      return NextResponse.json({ error: 'Missing combination ID' }, { status: 400 });
+      return NextResponse.json({ error: 'ID required' }, { status: 400 });
     }
 
-    await db.delete(combinations).where(eq(combinations.id, id));
+    const deleted = combinationDb.delete(id);
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Combination not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

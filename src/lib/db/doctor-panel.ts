@@ -1,390 +1,330 @@
+// ============================================
+// Doctor Panel Database Operations
+// Using LocalDatabase API
+// ============================================
+
 import { db } from './database';
-import { 
-  visits, 
-  prescriptions, 
-  fees, 
-  pharmacyQueue, 
-  combinations as combinationsTable,
-  medicineUsageMemory,
-  patients,
-  settings,
-  InsertVisit,
-  InsertPrescription,
-  InsertFee,
-  InsertPharmacyQueue,
-  InsertCombination,
-  InsertMedicineMemory,
-  SelectVisit,
+import type {
+  DoctorVisit,
+  DoctorPrescription,
+  CombinationMedicine,
+  PharmacyQueueItem,
+  MedicineUsageMemory,
 } from './schema';
-import { eq, desc, and } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
-import { differenceInDays, format } from 'date-fns';
 
-// ===== VISIT OPERATIONS =====
-
-export async function createVisit(visitData: InsertVisit) {
-  const visitId = uuidv4();
-  await db.insert(visits).values({
-    ...visitData,
-    id: visitId,
-    status: 'active',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-  return visitId;
+// Helper to generate ID
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-export async function updateVisit(visitId: string, data: Partial<InsertVisit>) {
-  await db.update(visits)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(visits.id, visitId));
-}
+// ============================================
+// Visit Operations
+// ============================================
 
-export async function getVisitById(visitId: string) {
-  const result = await db.select({
-    visit: visits,
-    patient: {
-      id: patients.id,
-      firstName: patients.firstName,
-      lastName: patients.lastName,
-      mobile: patients.mobile,
-      regNumber: patients.regNumber,
-      age: patients.age,
-      sex: patients.sex,
-    }
-  })
-  .from(visits)
-  .innerJoin(patients, eq(visits.patientId, patients.id))
-  .where(eq(visits.id, visitId))
-  .limit(1);
+export const doctorVisitDb = {
+  getAll: () => db.getAll<DoctorVisit>('visits'),
   
-  return result[0] as { visit: SelectVisit; patient: typeof patients.$inferSelect } | undefined;
-}
-
-export async function getPatientActiveVisit(patientId: string): Promise<SelectVisit | undefined> {
-  const result = await db.select()
-    .from(visits)
-    .where(and(
-      eq(visits.patientId, patientId),
-      eq(visits.status, 'active')
-    ))
-    .orderBy(desc(visits.visitDate))
-    .limit(1);
+  getById: (id: string) => db.getById<DoctorVisit>('visits', id),
   
-  return result[0] as SelectVisit | undefined;
-}
-
-export async function getPatientVisits(patientId: string, limit = 10): Promise<SelectVisit[]> {
-  return await db.select()
-    .from(visits)
-    .where(eq(visits.patientId, patientId))
-    .orderBy(desc(visits.visitDate))
-    .limit(limit) as SelectVisit[];
-}
-
-export async function closeVisit(visitId: string) {
-  await db.update(visits)
-    .set({ status: 'locked', updatedAt: new Date() })
-    .where(eq(visits.id, visitId));
-}
-
-// ===== PRESCRIPTION OPERATIONS =====
-
-export async function savePrescriptions(visitId: string, patientId: string, prescriptionsData: any[]) {
-  await db.delete(prescriptions).where(eq(prescriptions.visitId, visitId));
+  getByPatient: (patientId: string) => {
+    const visits = db.getAll<DoctorVisit>('visits');
+    return visits
+      .filter((v) => v.patientId === patientId)
+      .sort((a, b) => {
+        const dateA = a.visitDate instanceof Date ? a.visitDate.getTime() : new Date(a.visitDate).getTime();
+        const dateB = b.visitDate instanceof Date ? b.visitDate.getTime() : new Date(b.visitDate).getTime();
+        return dateB - dateA;
+      });
+  },
   
-  for (let i = 0; i < prescriptionsData.length; i++) {
-    const rx = prescriptionsData[i];
-    const prescriptionId = uuidv4();
-    
-    await db.insert(prescriptions).values({
-      id: prescriptionId,
-      visitId,
-      patientId,
-      medicine: rx.medicine,
-      potency: rx.potency,
-      quantity: rx.quantity,
-      doseForm: rx.doseForm || 'pills',
-      dosePattern: rx.dosePattern,
-      frequency: rx.frequency,
-      duration: rx.duration,
-      durationDays: rx.durationDays,
-      bottles: rx.bottles || 1,
-      instructions: rx.instructions,
-      rowOrder: i,
-      isCombination: rx.isCombination || false,
-      combinationName: rx.combinationName,
-      combinationContent: rx.combinationContent,
+  getActiveByPatient: (patientId: string) => {
+    const visits = db.getAll<DoctorVisit>('visits');
+    return visits.find(
+      (v) => v.patientId === patientId && v.status === 'active'
+    );
+  },
+  
+  create: (visit: Omit<DoctorVisit, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newVisit: DoctorVisit = {
+      ...visit,
+      id: generateId(),
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as InsertPrescription);
-
-    await updateMedicineMemory(rx);
-  }
-}
-
-export async function getVisitPrescriptions(visitId: string) {
-  return await db.select()
-    .from(prescriptions)
-    .where(eq(prescriptions.visitId, visitId))
-    .orderBy(prescriptions.rowOrder);
-}
-
-export async function getPatientLastPrescription(patientId: string) {
-  const result = await db.select()
-    .from(prescriptions)
-    .innerJoin(visits, eq(prescriptions.visitId, visits.id))
-    .where(and(
-      eq(prescriptions.patientId, patientId),
-      eq(visits.status, 'locked')
-    ))
-    .orderBy(desc(visits.visitDate))
-    .limit(1);
-  
-  return result;
-}
-
-// ===== FEE OPERATIONS =====
-
-export async function createOrUpdateFee(feeData: InsertFee) {
-  const existing = await db.select()
-    .from(fees)
-    .where(and(
-      eq(fees.patientId, feeData.patientId!),
-      eq(fees.visitId, feeData.visitId || null as any),
-      eq(fees.paymentStatus, 'pending')
-    ))
-    .limit(1);
-
-  if (existing[0]) {
-    await db.update(fees)
-      .set({ ...feeData, updatedAt: new Date() })
-      .where(eq(fees.id, existing[0].id));
-    return existing[0].id;
-  } else {
-    const feeId = uuidv4();
-    await db.insert(fees).values({
-      ...feeData,
-      id: feeId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as InsertFee);
-    return feeId;
-  }
-}
-
-export async function getPatientLastFee(patientId: string) {
-  const result = await db.select()
-    .from(fees)
-    .where(eq(fees.patientId, patientId))
-    .orderBy(desc(fees.createdAt))
-    .limit(1);
-  
-  return result[0];
-}
-
-// ===== COMBINATION MEDICINES =====
-
-export async function saveCombination(comboData: InsertCombination) {
-  const existing = await db.select()
-    .from(combinationsTable)
-    .where(eq(combinationsTable.name, comboData.name))
-    .limit(1);
-
-  if (existing[0]) {
-    await db.update(combinationsTable)
-      .set({ ...comboData, updatedAt: new Date() })
-      .where(eq(combinationsTable.id, existing[0].id));
-    return existing[0].id;
-  } else {
-    const id = uuidv4();
-    await db.insert(combinationsTable).values({
-      ...comboData,
-      id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as InsertCombination);
-    return id;
-  }
-}
-
-export async function getCombinations() {
-  return await db.select()
-    .from(combinationsTable)
-    .orderBy(combinationsTable.name);
-}
-
-export async function getCombinationByName(name: string) {
-  const result = await db.select()
-    .from(combinationsTable)
-    .where(eq(combinationsTable.name, name))
-    .limit(1);
-  return result[0];
-}
-
-// ===== MEDICINE USAGE MEMORY =====
-
-export async function updateMedicineMemory(rx: any) {
-  const potencyCondition = rx.potency 
-    ? eq(medicineUsageMemory.potency, rx.potency)
-    : eq(medicineUsageMemory.potency, null as any);
-
-  const existing = await db.select()
-    .from(medicineUsageMemory)
-    .where(and(
-      eq(medicineUsageMemory.medicine, rx.medicine),
-      potencyCondition
-    ))
-    .limit(1);
-
-  if (existing[0]) {
-    await db.update(medicineUsageMemory)
-      .set({ 
-        quantity: rx.quantity,
-        doseForm: rx.doseForm,
-        dosePattern: rx.dosePattern,
-        frequency: rx.frequency,
-        duration: rx.duration,
-        useCount: (existing[0].useCount || 0) + 1,
-        lastUsedAt: new Date(),
-      })
-      .where(eq(medicineUsageMemory.id, existing[0].id));
-  } else {
-    const id = uuidv4();
-    await db.insert(medicineUsageMemory).values({
-      id,
-      medicine: rx.medicine,
-      potency: rx.potency,
-      quantity: rx.quantity,
-      doseForm: rx.doseForm,
-      dosePattern: rx.dosePattern,
-      frequency: rx.frequency,
-      duration: rx.duration,
-      useCount: 1,
-      lastUsedAt: new Date(),
-      createdAt: new Date(),
-    } as InsertMedicineMemory);
-  }
-}
-
-export async function getMedicineMemory(medicine: string, potency?: string) {
-  if (potency) {
-    return await db.select()
-      .from(medicineUsageMemory)
-      .where(and(
-        eq(medicineUsageMemory.medicine, medicine),
-        eq(medicineUsageMemory.potency, potency)
-      ))
-      .orderBy(desc(medicineUsageMemory.useCount))
-      .limit(5);
-  }
-
-  return await db.select()
-    .from(medicineUsageMemory)
-    .where(eq(medicineUsageMemory.medicine, medicine))
-    .orderBy(desc(medicineUsageMemory.useCount))
-    .limit(5);
-}
-
-// ===== PHARMACY QUEUE =====
-
-export async function addToPharmacyQueue(data: InsertPharmacyQueue) {
-  const id = uuidv4();
-  await db.insert(pharmacyQueue).values({
-    ...data,
-    id,
-    status: 'pending',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as InsertPharmacyQueue);
-  return id;
-}
-
-export async function updatePharmacyStatus(
-  queueId: string, 
-  status: 'preparing' | 'ready' | 'delivered' | 'stopped',
-  stopReason?: string
-) {
-  const updateData: any = { status, updatedAt: new Date() };
-  
-  if (status === 'delivered') {
-    updateData.deliveredAt = new Date();
-  }
-  if (status === 'stopped') {
-    updateData.stopReason = stopReason;
-  }
-
-  await db.update(pharmacyQueue)
-    .set(updateData)
-    .where(eq(pharmacyQueue.id, queueId));
-}
-
-export async function getPharmacyQueue() {
-  return await db.select()
-    .from(pharmacyQueue)
-    .where(eq(pharmacyQueue.status, 'pending'))
-    .orderBy(desc(pharmacyQueue.priority), desc(pharmacyQueue.createdAt));
-}
-
-// ===== VISIT STATISTICS =====
-
-export async function getVisitStats(patientId: string) {
-  const visitsList = await db.select()
-    .from(visits)
-    .where(eq(visits.patientId, patientId))
-    .orderBy(desc(visits.visitDate));
-
-  if (visitsList.length === 0) {
-    return {
-      totalVisits: 0,
-      lastVisitDate: null,
-      daysSinceLastVisit: null,
-      lastPrescription: null,
     };
-  }
+    db.create('visits', newVisit as unknown as Record<string, unknown>);
+    return newVisit;
+  },
+  
+  update: (id: string, updates: Partial<Omit<DoctorVisit, 'id' | 'createdAt'>>) => {
+    const result = db.update<DoctorVisit>('visits', id, updates as Record<string, unknown>);
+    return result;
+  },
+  
+  complete: (id: string) => {
+    const result = db.update<DoctorVisit>('visits', id, {
+      status: 'completed',
+      updatedAt: new Date(),
+    } as Record<string, unknown>);
+    return result;
+  },
+  
+  delete: (id: string) => db.delete('visits', id),
+};
 
-  const lastVisit = visitsList[0] as SelectVisit;
-  const lastVisitDate = lastVisit?.visitDate ? new Date(lastVisit.visitDate) : null;
-  const daysSinceLastVisit = lastVisitDate 
-    ? differenceInDays(new Date(), lastVisitDate)
-    : null;
+// ============================================
+// Prescription Operations
+// ============================================
 
-  return {
-    totalVisits: visitsList.length,
-    lastVisitDate: lastVisitDate ? format(lastVisitDate, 'dd MMM yyyy') : null,
-    daysSinceLastVisit,
-    lastVisit: lastVisit,
-  };
-}
-
-// ===== SETTINGS HELPERS =====
-
-export async function getSetting(key: string) {
-  const result = await db.select()
-    .from(settings)
-    .where(eq(settings.key, key))
-    .limit(1);
-  return result[0]?.value;
-}
-
-export async function saveSetting(key: string, value: string, category: string) {
-  const existing = await db.select()
-    .from(settings)
-    .where(eq(settings.key, key))
-    .limit(1);
-
-  if (existing[0]) {
-    await db.update(settings)
-      .set({ value, updatedAt: new Date() })
-      .where(eq(settings.id, existing[0].id));
-  } else {
-    await db.insert(settings).values({
-      id: uuidv4(),
-      key,
-      value,
-      category,
+export const doctorPrescriptionDb = {
+  getAll: () => db.getAll<DoctorPrescription>('prescriptions'),
+  
+  getById: (id: string) => db.getById<DoctorPrescription>('prescriptions', id),
+  
+  getByVisit: (visitId: string) => {
+    const prescriptions = db.getAll<DoctorPrescription>('prescriptions');
+    return prescriptions
+      .filter((p) => p.visitId === visitId)
+      .sort((a, b) => (a.rowOrder || 0) - (b.rowOrder || 0));
+  },
+  
+  getByPatient: (patientId: string) => {
+    const prescriptions = db.getAll<DoctorPrescription>('prescriptions');
+    return prescriptions.filter((p) => p.patientId === patientId);
+  },
+  
+  create: (prescription: Omit<DoctorPrescription, 'id'>) => {
+    const newPrescription: DoctorPrescription = {
+      ...prescription,
+      id: generateId(),
       createdAt: new Date(),
       updatedAt: new Date(),
+    };
+    db.create('prescriptions', newPrescription as unknown as Record<string, unknown>);
+    return newPrescription;
+  },
+  
+  update: (id: string, updates: Partial<DoctorPrescription>) => {
+    const result = db.update<DoctorPrescription>('prescriptions', id, updates as Record<string, unknown>);
+    return result;
+  },
+  
+  delete: (id: string) => db.delete('prescriptions', id),
+  
+  deleteByVisit: (visitId: string) => {
+    const prescriptions = db.getAll<DoctorPrescription>('prescriptions');
+    prescriptions.forEach((p) => {
+      if (p.visitId === visitId) {
+        db.delete('prescriptions', p.id);
+      }
     });
-  }
-}
+  },
+};
+
+// ============================================
+// Combination Medicine Operations
+// ============================================
+
+export const combinationDb = {
+  getAll: () => db.getAll<CombinationMedicine>('combinations'),
+  
+  getById: (id: string) => db.getById<CombinationMedicine>('combinations', id),
+  
+  getByName: (name: string) => {
+    const combinations = db.getAll<CombinationMedicine>('combinations');
+    return combinations.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  },
+  
+  search: (query: string) => {
+    const combinations = db.getAll<CombinationMedicine>('combinations');
+    const lowerQuery = query.toLowerCase();
+    return combinations.filter((c) =>
+      c.name.toLowerCase().includes(lowerQuery) ||
+      c.content.toLowerCase().includes(lowerQuery)
+    );
+  },
+  
+  create: (combination: Omit<CombinationMedicine, 'id'>) => {
+    const newCombination: CombinationMedicine = {
+      ...combination,
+      id: generateId(),
+    };
+    db.create('combinations', newCombination as unknown as Record<string, unknown>);
+    return newCombination;
+  },
+  
+  update: (id: string, updates: Partial<CombinationMedicine>) => {
+    const result = db.update<CombinationMedicine>('combinations', id, updates as Record<string, unknown>);
+    return result;
+  },
+  
+  delete: (id: string) => db.delete('combinations', id),
+};
+
+// ============================================
+// Pharmacy Queue Operations
+// ============================================
+
+export const pharmacyQueueDb = {
+  getAll: () => db.getAll<PharmacyQueueItem>('pharmacy'),
+  
+  getById: (id: string) => db.getById<PharmacyQueueItem>('pharmacy', id),
+  
+  getByVisit: (visitId: string) => {
+    const queue = db.getAll<PharmacyQueueItem>('pharmacy');
+    return queue.find((q) => q.visitId === visitId);
+  },
+  
+  getPending: () => {
+    const queue = db.getAll<PharmacyQueueItem>('pharmacy');
+    return queue
+      .filter((q) => q.status === 'pending')
+      .sort((a, b) => {
+        // Priority first, then by creation time
+        if (a.priority && !b.priority) return -1;
+        if (!a.priority && b.priority) return 1;
+        const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        return timeA - timeB;
+      });
+  },
+  
+  getByPatient: (patientId: string) => {
+    const queue = db.getAll<PharmacyQueueItem>('pharmacy');
+    return queue.filter((q) => q.patientId === patientId);
+  },
+  
+  create: (item: Omit<PharmacyQueueItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newItem: PharmacyQueueItem = {
+      ...item,
+      id: generateId(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    db.create('pharmacy', newItem as unknown as Record<string, unknown>);
+    return newItem;
+  },
+  
+  update: (id: string, updates: Partial<PharmacyQueueItem>) => {
+    const result = db.update<PharmacyQueueItem>('pharmacy', id, {
+      ...updates,
+      updatedAt: new Date(),
+    } as Record<string, unknown>);
+    return result;
+  },
+  
+  markPrepared: (id: string, preparedBy: string) => {
+    const result = db.update<PharmacyQueueItem>('pharmacy', id, {
+      status: 'prepared',
+      preparedBy,
+      updatedAt: new Date(),
+    } as Record<string, unknown>);
+    return result;
+  },
+  
+  markDelivered: (id: string) => {
+    const result = db.update<PharmacyQueueItem>('pharmacy', id, {
+      status: 'delivered',
+      deliveredAt: new Date(),
+      updatedAt: new Date(),
+    } as Record<string, unknown>);
+    return result;
+  },
+  
+  stop: (id: string, reason: string) => {
+    const result = db.update<PharmacyQueueItem>('pharmacy', id, {
+      status: 'stopped',
+      stopReason: reason,
+      updatedAt: new Date(),
+    } as Record<string, unknown>);
+    return result;
+  },
+  
+  delete: (id: string) => db.delete('pharmacy', id),
+};
+
+// ============================================
+// Medicine Usage Memory Operations
+// ============================================
+
+export const medicineMemoryDb = {
+  getAll: () => db.getAll<MedicineUsageMemory>('medicineUsageMemory'),
+  
+  getById: (id: string) => db.getById<MedicineUsageMemory>('medicineUsageMemory', id),
+  
+  findByMedicine: (medicine: string, potency?: string) => {
+    const memory = db.getAll<MedicineUsageMemory>('medicineUsageMemory');
+    return memory.find((m) => {
+      if (m.medicine.toLowerCase() !== medicine.toLowerCase()) return false;
+      if (potency && m.potency !== potency) return false;
+      return true;
+    });
+  },
+  
+  getTopUsed: (limit: number = 10) => {
+    const memory = db.getAll<MedicineUsageMemory>('medicineUsageMemory');
+    return memory
+      .sort((a, b) => b.useCount - a.useCount)
+      .slice(0, limit);
+  },
+  
+  incrementUse: (medicine: string, potency?: string, quantity?: string) => {
+    const existing = medicineMemoryDb.findByMedicine(medicine, potency);
+    
+    if (existing) {
+      const result = db.update<MedicineUsageMemory>('medicineUsageMemory', existing.id, {
+        useCount: existing.useCount + 1,
+        lastUsedAt: new Date(),
+        quantity: quantity || existing.quantity,
+      } as Record<string, unknown>);
+      return result;
+    } else {
+      const newMemory: MedicineUsageMemory = {
+        id: generateId(),
+        medicine,
+        potency,
+        quantity,
+        useCount: 1,
+        lastUsedAt: new Date(),
+        createdAt: new Date(),
+      };
+      db.create('medicineUsageMemory', newMemory as unknown as Record<string, unknown>);
+      return newMemory;
+    }
+  },
+  
+  create: (memory: Omit<MedicineUsageMemory, 'id' | 'createdAt'>) => {
+    const newMemory: MedicineUsageMemory = {
+      ...memory,
+      id: generateId(),
+      createdAt: new Date(),
+    };
+    db.create('medicineUsageMemory', newMemory as unknown as Record<string, unknown>);
+    return newMemory;
+  },
+  
+  delete: (id: string) => db.delete('medicineUsageMemory', id),
+};
+
+// ============================================
+// Settings Operations
+// ============================================
+
+export const doctorSettingsDb = {
+  get: (key: string) => {
+    const settings = db.getAll('settings');
+    const found = settings.find((s: unknown) => {
+      const setting = s as { key: string };
+      return setting.key === key;
+    });
+    return found ? (found as { value: string }).value : null;
+  },
+  
+  set: (key: string, value: string, category: string = 'doctor') => {
+    const existing = doctorSettingsDb.get(key);
+    if (existing !== null) {
+      db.update('settings', key, { value, category } as Record<string, unknown>);
+    } else {
+      db.create('settings', { id: key, key, value, category, createdAt: new Date(), updatedAt: new Date() } as Record<string, unknown>);
+    }
+  },
+};

@@ -1,72 +1,38 @@
+// ============================================
+// Visit API Route
+// Doctor Panel - Visit Management
+// ============================================
+
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db/database';
-import { visits, prescriptions, fees, pharmacyQueue, patients } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { doctorVisitDb } from '@/lib/db/doctor-panel';
+import type { DoctorVisit } from '@/lib/db/schema';
 
-// GET - Fetch visit details
+// GET - Retrieve visits
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const patientId = searchParams.get('patientId');
-  const visitId = searchParams.get('visitId');
-
   try {
-    if (visitId) {
-      // Fetch specific visit with patient info
-      const visit = await db.select({
-        visit: visits,
-        patient: {
-          id: patients.id,
-          firstName: patients.firstName,
-          lastName: patients.lastName,
-          mobile: patients.mobile,
-          regNumber: patients.regNumber,
-          age: patients.age,
-          sex: patients.sex,
-        }
-      })
-      .from(visits)
-      .innerJoin(patients, eq(visits.patientId, patients.id))
-      .where(eq(visits.id, visitId))
-      .limit(1);
+    const { searchParams } = new URL(request.url);
+    const visitId = searchParams.get('id');
+    const patientId = searchParams.get('patientId');
 
-      if (!visit[0]) {
+    if (visitId) {
+      const visit = doctorVisitDb.getById(visitId);
+      if (!visit) {
         return NextResponse.json({ error: 'Visit not found' }, { status: 404 });
       }
-
-      // Fetch prescriptions for this visit
-      const visitPrescriptions = await db.select()
-        .from(prescriptions)
-        .where(eq(prescriptions.visitId, visitId))
-        .orderBy(prescriptions.rowOrder);
-
-      // Fetch fees for this visit
-      const visitFees = await db.select()
-        .from(fees)
-        .where(eq(fees.visitId, visitId))
-        .orderBy(desc(fees.createdAt));
-
-      return NextResponse.json({
-        ...visit[0],
-        prescriptions: visitPrescriptions,
-        fees: visitFees,
-      });
+      return NextResponse.json(visit);
     }
 
     if (patientId) {
-      // Fetch all visits for a patient
-      const patientVisits = await db.select()
-        .from(visits)
-        .where(eq(visits.patientId, patientId))
-        .orderBy(desc(visits.visitDate));
-
-      return NextResponse.json(patientVisits);
+      const visits = doctorVisitDb.getByPatient(patientId);
+      return NextResponse.json(visits);
     }
 
-    return NextResponse.json({ error: 'Missing patientId or visitId' }, { status: 400 });
+    // Return all visits if no filters
+    const visits = doctorVisitDb.getAll();
+    return NextResponse.json(visits);
   } catch (error) {
-    console.error('Error fetching visit:', error);
-    return NextResponse.json({ error: 'Failed to fetch visit' }, { status: 500 });
+    console.error('Error fetching visits:', error);
+    return NextResponse.json({ error: 'Failed to fetch visits' }, { status: 500 });
   }
 }
 
@@ -74,102 +40,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      patientId,
-      chiefComplaint,
-      caseText,
-      diagnosis,
-      advice,
-      testsRequired,
-      nextVisit,
-      prognosis,
-      remarksToFrontdesk,
-      prescriptions: prescriptionData,
-      feeAmount,
-      feeType,
-      paymentStatus,
-      discountPercent,
-      discountReason,
-    } = body;
-
-    // Get next visit number for this patient
-    const lastVisit = await db.select()
-      .from(visits)
-      .where(eq(visits.patientId, patientId))
-      .orderBy(desc(visits.visitNumber))
-      .limit(1);
-
-    const visitNumber = (lastVisit[0]?.visitNumber || 0) + 1;
-    const visitId = uuidv4();
-
-    // Create visit
-    await db.insert(visits).values({
-      id: visitId,
-      patientId,
-      visitDate: new Date(),
-      visitNumber,
-      chiefComplaint,
-      caseText,
-      diagnosis,
-      advice,
-      testsRequired,
-      nextVisit: nextVisit ? new Date(nextVisit) : null,
-      prognosis,
-      remarksToFrontdesk,
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    
+    const newVisit = doctorVisitDb.create({
+      patientId: body.patientId,
+      visitDate: new Date(body.visitDate || Date.now()),
+      visitNumber: body.visitNumber || 1,
+      tokenNumber: body.tokenNumber,
+      chiefComplaint: body.chiefComplaint,
+      caseText: body.caseText,
+      diagnosis: body.diagnosis,
+      advice: body.advice,
+      testsRequired: body.testsRequired,
+      nextVisit: body.nextVisit ? new Date(body.nextVisit) : undefined,
+      prognosis: body.prognosis,
+      remarksToFrontdesk: body.remarksToFrontdesk,
+      status: body.status || 'active',
     });
 
-    // Create prescriptions if provided
-    if (prescriptionData && prescriptionData.length > 0) {
-      for (let i = 0; i < prescriptionData.length; i++) {
-        const rx = prescriptionData[i];
-        await db.insert(prescriptions).values({
-          id: uuidv4(),
-          visitId,
-          patientId,
-          medicine: rx.medicine,
-          potency: rx.potency,
-          quantity: rx.quantity,
-          doseForm: rx.doseForm || 'pills',
-          dosePattern: rx.dosePattern,
-          frequency: rx.frequency,
-          duration: rx.duration,
-          durationDays: rx.durationDays,
-          bottles: rx.bottles || 1,
-          instructions: rx.instructions,
-          rowOrder: i,
-          isCombination: rx.isCombination || false,
-          combinationName: rx.combinationName,
-          combinationContent: rx.combinationContent,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
-    }
-
-    // Create fee if provided
-    if (feeAmount) {
-      await db.insert(fees).values({
-        id: uuidv4(),
-        patientId,
-        visitId,
-        amount: parseFloat(feeAmount),
-        feeType: feeType || 'consultation',
-        paymentStatus: paymentStatus || 'pending',
-        discountPercent: discountPercent ? parseFloat(discountPercent) : null,
-        discountReason: discountReason,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      visitId,
-      visitNumber,
-    });
+    return NextResponse.json(newVisit, { status: 201 });
   } catch (error) {
     console.error('Error creating visit:', error);
     return NextResponse.json({ error: 'Failed to create visit' }, { status: 500 });
@@ -179,91 +67,59 @@ export async function POST(request: NextRequest) {
 // PUT - Update visit
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
-    const {
-      visitId,
-      chiefComplaint,
-      caseText,
-      diagnosis,
-      advice,
-      testsRequired,
-      nextVisit,
-      prognosis,
-      remarksToFrontdesk,
-      prescriptions: prescriptionData,
-      status,
-    } = body;
+    const { searchParams } = new URL(request.url);
+    const visitId = searchParams.get('id');
 
-    // Update visit
-    await db.update(visits)
-      .set({
-        chiefComplaint,
-        caseText,
-        diagnosis,
-        advice,
-        testsRequired,
-        nextVisit: nextVisit ? new Date(nextVisit) : null,
-        prognosis,
-        remarksToFrontdesk,
-        status,
-        updatedAt: new Date(),
-      })
-      .where(eq(visits.id, visitId));
-
-    // Update prescriptions if provided
-    if (prescriptionData && prescriptionData.length > 0) {
-      // Delete existing prescriptions
-      await db.delete(prescriptions).where(eq(prescriptions.visitId, visitId));
-
-      // Insert new prescriptions
-      for (let i = 0; i < prescriptionData.length; i++) {
-        const rx = prescriptionData[i];
-        await db.insert(prescriptions).values({
-          id: uuidv4(),
-          visitId,
-          patientId: rx.patientId,
-          medicine: rx.medicine,
-          potency: rx.potency,
-          quantity: rx.quantity,
-          doseForm: rx.doseForm || 'pills',
-          dosePattern: rx.dosePattern,
-          frequency: rx.frequency,
-          duration: rx.duration,
-          durationDays: rx.durationDays,
-          bottles: rx.bottles || 1,
-          instructions: rx.instructions,
-          rowOrder: i,
-          isCombination: rx.isCombination || false,
-          combinationName: rx.combinationName,
-          combinationContent: rx.combinationContent,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
+    if (!visitId) {
+      return NextResponse.json({ error: 'Visit ID required' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, visitId });
+    const body = await request.json();
+    const updates: Partial<DoctorVisit> = {};
+
+    if (body.chiefComplaint !== undefined) updates.chiefComplaint = body.chiefComplaint;
+    if (body.caseText !== undefined) updates.caseText = body.caseText;
+    if (body.diagnosis !== undefined) updates.diagnosis = body.diagnosis;
+    if (body.advice !== undefined) updates.advice = body.advice;
+    if (body.testsRequired !== undefined) updates.testsRequired = body.testsRequired;
+    if (body.nextVisit !== undefined) updates.nextVisit = new Date(body.nextVisit);
+    if (body.prognosis !== undefined) updates.prognosis = body.prognosis;
+    if (body.remarksToFrontdesk !== undefined) updates.remarksToFrontdesk = body.remarksToFrontdesk;
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.tokenNumber !== undefined) updates.tokenNumber = body.tokenNumber;
+
+    const updated = doctorVisitDb.update(visitId, updates);
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Visit not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(updated);
   } catch (error) {
     console.error('Error updating visit:', error);
     return NextResponse.json({ error: 'Failed to update visit' }, { status: 500 });
   }
 }
 
-// PATCH - Close visit (end consultation)
-export async function PATCH(request: NextRequest) {
+// DELETE - Delete visit
+export async function DELETE(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { visitId, action } = body;
+    const { searchParams } = new URL(request.url);
+    const visitId = searchParams.get('id');
 
-    if (action === 'close') {
-      await db.update(visits)
-        .set({ status: 'locked', updatedAt: new Date() })
-        .where(eq(visits.id, visitId));
+    if (!visitId) {
+      return NextResponse.json({ error: 'Visit ID required' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, visitId });
+    const deleted = doctorVisitDb.delete(visitId);
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Visit not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error closing visit:', error);
-    return NextResponse.json({ error: 'Failed to close visit' }, { status: 500 });
+    console.error('Error deleting visit:', error);
+    return NextResponse.json({ error: 'Failed to delete visit' }, { status: 500 });
   }
 }

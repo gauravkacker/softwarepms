@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 
-// Types
+import type { DoctorVisit, DoctorPrescription } from '@/lib/db/schema';
+
+// Local types for Doctor Panel (simpler for UI state)
 interface Patient {
   id: string;
   firstName: string;
@@ -946,11 +949,4 @@ export default function DoctorPanelPage() {
   );
 }
 
-// Helper function (would be imported in real implementation)
-function uuidv4() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+

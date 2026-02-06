@@ -1,29 +1,46 @@
+// ============================================
+// Pharmacy API Route
+// Doctor Panel - Pharmacy Queue Management
+// ============================================
+
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db/database';
-import { pharmacyQueue } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { pharmacyQueueDb, medicineMemoryDb } from '@/lib/db/doctor-panel';
+import type { PharmacyQueueItem } from '@/lib/db/schema';
 
-// GET - Fetch pharmacy queue
+// GET - Retrieve pharmacy queue items
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get('status');
-
   try {
-    if (status) {
-      const queueItems = await db.select()
-        .from(pharmacyQueue)
-        .where(eq(pharmacyQueue.status, status))
-        .orderBy(desc(pharmacyQueue.priority), desc(pharmacyQueue.createdAt));
-      return NextResponse.json(queueItems);
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const visitId = searchParams.get('visitId');
+    const patientId = searchParams.get('patientId');
+    const status = searchParams.get('status');
+
+    if (id) {
+      const item = pharmacyQueueDb.getById(id);
+      if (!item) {
+        return NextResponse.json({ error: 'Pharmacy item not found' }, { status: 404 });
+      }
+      return NextResponse.json(item);
     }
 
-    const queueItems = await db.select()
-      .from(pharmacyQueue)
-      .where(eq(pharmacyQueue.status, 'pending'))
-      .orderBy(desc(pharmacyQueue.priority), desc(pharmacyQueue.createdAt));
+    if (visitId) {
+      const item = pharmacyQueueDb.getByVisit(visitId);
+      return NextResponse.json(item || null);
+    }
 
-    return NextResponse.json(queueItems);
+    if (patientId) {
+      const items = pharmacyQueueDb.getByPatient(patientId);
+      return NextResponse.json(items);
+    }
+
+    if (status === 'pending') {
+      const items = pharmacyQueueDb.getPending();
+      return NextResponse.json(items);
+    }
+
+    const items = pharmacyQueueDb.getAll();
+    return NextResponse.json(items);
   } catch (error) {
     console.error('Error fetching pharmacy queue:', error);
     return NextResponse.json({ error: 'Failed to fetch pharmacy queue' }, { status: 500 });
@@ -34,49 +51,92 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { visitId, patientId, prescriptionIds, priority = false } = body;
-
-    const queueId = uuidv4();
-    await db.insert(pharmacyQueue).values({
-      id: queueId,
-      visitId,
-      patientId,
-      prescriptionIds: JSON.stringify(prescriptionIds),
-      priority,
-      status: 'pending',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    
+    const newItem = pharmacyQueueDb.create({
+      visitId: body.visitId,
+      patientId: body.patientId,
+      prescriptionIds: body.prescriptionIds || [],
+      priority: body.priority || false,
+      status: body.status || 'pending',
     });
 
-    return NextResponse.json({ success: true, queueId });
+    // Update medicine usage memory for each prescription
+    if (body.medicines && Array.isArray(body.medicines)) {
+      body.medicines.forEach((med: { medicine: string; potency?: string; quantity?: string }) => {
+        medicineMemoryDb.incrementUse(med.medicine, med.potency, med.quantity);
+      });
+    }
+
+    return NextResponse.json(newItem, { status: 201 });
   } catch (error) {
     console.error('Error adding to pharmacy queue:', error);
     return NextResponse.json({ error: 'Failed to add to pharmacy queue' }, { status: 500 });
   }
 }
 
-// PATCH - Update pharmacy status
-export async function PATCH(request: NextRequest) {
+// PUT - Update pharmacy item status
+export async function PUT(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    }
+
     const body = await request.json();
-    const { queueId, status, stopReason, preparedBy } = body;
+    
+    let updated;
 
-    const updateData: any = { status, updatedAt: new Date() };
-
-    if (status === 'delivered') {
-      updateData.deliveredAt = new Date();
+    switch (body.action) {
+      case 'markPrepared':
+        updated = pharmacyQueueDb.markPrepared(id, body.preparedBy || 'staff');
+        break;
+      case 'markDelivered':
+        updated = pharmacyQueueDb.markDelivered(id);
+        break;
+      case 'stop':
+        updated = pharmacyQueueDb.stop(id, body.reason || 'Stopped by doctor');
+        break;
+      default:
+        // Generic update
+        const updates: Partial<PharmacyQueueItem> = {};
+        if (body.status !== undefined) updates.status = body.status;
+        if (body.priority !== undefined) updates.priority = body.priority;
+        if (body.prescriptionIds !== undefined) updates.prescriptionIds = body.prescriptionIds;
+        updated = pharmacyQueueDb.update(id, updates);
     }
-    if (status === 'stopped') {
-      updateData.stopReason = stopReason;
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Pharmacy item not found' }, { status: 404 });
     }
 
-    await db.update(pharmacyQueue)
-      .set(updateData)
-      .where(eq(pharmacyQueue.id, queueId));
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Error updating pharmacy item:', error);
+    return NextResponse.json({ error: 'Failed to update pharmacy item' }, { status: 500 });
+  }
+}
+
+// DELETE - Remove from pharmacy queue
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    }
+
+    const deleted = pharmacyQueueDb.delete(id);
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Pharmacy item not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating pharmacy status:', error);
-    return NextResponse.json({ error: 'Failed to update pharmacy status' }, { status: 500 });
+    console.error('Error deleting pharmacy item:', error);
+    return NextResponse.json({ error: 'Failed to delete pharmacy item' }, { status: 500 });
   }
 }
