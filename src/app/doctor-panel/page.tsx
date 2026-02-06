@@ -1,20 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { DoctorVisit, DoctorPrescription } from '@/lib/db/schema';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { patientDb, appointmentDb } from '@/lib/db/database';
+import type { Patient, Appointment } from '@/types';
 
 // Local types for Doctor Panel (simpler for UI state)
-interface Patient {
+interface PatientRecord {
   id: string;
   firstName: string;
   lastName: string;
   mobile: string;
-  regNumber: string;
+  registrationNumber: string;
   age?: number;
-  sex?: string;
+  gender?: string;
 }
 
 interface Visit {
@@ -49,19 +53,18 @@ interface Prescription {
   combinationContent?: string;
 }
 
-interface CaseNote {
-  text: string;
-  isVague?: boolean;
-  suggestions?: string[];
-}
-
 // Main Component
 export default function DoctorPanelPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const patientIdFromUrl = searchParams.get('patientId');
 
   // State
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [patient, setPatient] = useState<PatientRecord | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PatientRecord[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentVisit, setCurrentVisit] = useState<Visit | null>(null);
   const [pastVisits, setPastVisits] = useState<Visit[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
@@ -102,23 +105,67 @@ export default function DoctorPanelPage() {
   // Refs
   const caseTextRef = useRef<HTMLTextAreaElement>(null);
   const medicineInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Load patient data
+  // Search for patients
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    
+    if (query.trim().length > 0) {
+      const allPatients = patientDb.getAll() as Patient[];
+      const filtered = allPatients.filter((p) =>
+        p.firstName.toLowerCase().includes(query.toLowerCase()) ||
+        p.lastName.toLowerCase().includes(query.toLowerCase()) ||
+        p.fullName.toLowerCase().includes(query.toLowerCase()) ||
+        p.registrationNumber.toLowerCase().includes(query.toLowerCase()) ||
+        p.mobileNumber.includes(query)
+      ).map((p): PatientRecord => ({
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        mobile: p.mobileNumber,
+        registrationNumber: p.registrationNumber,
+        age: p.dateOfBirth ? new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear() : undefined,
+        gender: p.gender,
+      }));
+      setSearchResults(filtered);
+      setShowSearchResults(true);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  // Select a patient from search results
+  const handleSelectPatient = (selectedPatient: PatientRecord) => {
+    loadPatientData(selectedPatient.id);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+    
+    // Update URL with patient ID
+    router.push(`/doctor-panel?patientId=${selectedPatient.id}`);
+  };
+
+  // Load patient data from database
   const loadPatientData = useCallback(async (id: string) => {
-    // TODO: Fetch patient, visits, and fee data from API
-    // For now, using mock data
-    const mockPatient: Patient = {
-      id,
-      firstName: 'John',
-      lastName: 'Doe',
-      mobile: '9876543210',
-      regNumber: 'DK-001',
-      age: 35,
-      sex: 'Male',
-    };
-    setPatient(mockPatient);
+    const patientData = patientDb.getById(id) as Patient | undefined;
+    
+    if (patientData) {
+      const patientRecord: PatientRecord = {
+        id: patientData.id,
+        firstName: patientData.firstName,
+        lastName: patientData.lastName,
+        mobile: patientData.mobileNumber,
+        registrationNumber: patientData.registrationNumber,
+        age: patientData.dateOfBirth ? new Date().getFullYear() - new Date(patientData.dateOfBirth).getFullYear() : undefined,
+        gender: patientData.gender,
+      };
+      setPatient(patientRecord);
+    }
 
-    // Check for active visit
+    // Check for active visit (in a real app, this would query the visit table)
     const mockActiveVisit: Visit = {
       id: uuidv4(),
       patientId: id,
@@ -145,11 +192,11 @@ export default function DoctorPanelPage() {
     // Mock last fee
     setFeeAmount('500');
     setFeeType('consultation');
-  }, []);
+  }, [setPatient, setCurrentVisit, setPastVisits, setFeeAmount, setFeeType]);
 
+  // Load patient from URL on mount
   useEffect(() => {
     if (patientIdFromUrl) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadPatientData(patientIdFromUrl);
     }
   }, [patientIdFromUrl, loadPatientData]);
@@ -355,592 +402,737 @@ export default function DoctorPanelPage() {
 
   // ===== RENDER =====
 
-  if (!patient) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Doctor Panel</h1>
-          <p className="text-gray-600">Please select a patient from the appointment list.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Patient Context */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold text-gray-800">Doctor Panel</h1>
-            
-            {/* Patient Info Card */}
-            <div className="flex items-center gap-4 bg-blue-50 px-4 py-2 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-blue-800">
-                  {patient.firstName} {patient.lastName}
-                </p>
-                <p className="text-xs text-blue-600">
-                  Reg: {patient.regNumber} | {patient.age}yrs | {patient.sex}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Mobile</p>
-                <p className="text-sm font-medium">{patient.mobile}</p>
-              </div>
-            </div>
-
-            {/* Visit Stats */}
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-gray-500">Visits: {pastVisits.length + 1}</span>
-              {pastVisits[0] && (
-                <span className="text-gray-500">
-                  Last: {new Date(pastVisits[0].visitDate).toLocaleDateString()}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowPharmacyQueue(!showPharmacyQueue)}
-              className="px-4 py-2 text-sm bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100"
-            >
-              Pharmacy Queue ({3})
-            </button>
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-            >
-              {showHistory ? 'Hide' : 'Show'} History
-            </button>
-            <button
-              onClick={() => setShowMateriaMedica(!showMateriaMedica)}
-              className="px-4 py-2 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100"
-            >
-              Materia Medica
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex gap-6 p-6">
-        {/* Left Column - Case Taking */}
-        <div className="flex-1 space-y-6">
-          {/* Case Taking Section */}
-          <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-800">Case Taking</h2>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setIsSystemAssist(!isSystemAssist)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                    isSystemAssist 
-                      ? 'bg-amber-100 text-amber-700 border border-amber-300' 
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  System Assist {isSystemAssist ? 'ON' : 'OFF'}
-                </button>
-              </div>
-            </div>
-            
-            <div className="p-6">
-              <textarea
-                ref={caseTextRef}
-                value={caseText}
-                onChange={handleCaseTextChange}
-                placeholder="Type case symptoms here...&#10;Press Enter for new symptom&#10;&#10;Example:&#10;Pain in knee joints&#10;Worse in cold weather&#10;Better by motion"
-                className="w-full h-64 p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              />
-              
-              {isSystemAssist && (
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-700 font-medium mb-2">💡 Suggestions</p>
-                  <ul className="text-sm text-amber-600 space-y-1">
-                    <li>• Consider asking about timing (morning/evening)</li>
-                    <li>• Explore aggravating/ameliorating factors</li>
-                    <li>• Ask about appetite, thirst, sleep</li>
-                  </ul>
+      <Sidebar />
+      
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+        {/* No Patient Selected - Show Search */}
+        {!patient && (
+          <div className="flex items-center justify-center min-h-[calc(100vh-100px)]">
+            <div className="text-center max-w-md w-full px-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-              )}
-            </div>
-          </section>
-
-          {/* Prescription Table */}
-          <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-800">Prescription</h2>
-              <button
-                onClick={addEmptyPrescriptionRow}
-                className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
-              >
-                + Add Medicine
-              </button>
-            </div>
-            
-            <div className="p-6">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-500 border-b border-gray-100">
-                    <th className="pb-3 font-medium">Medicine</th>
-                    <th className="pb-3 font-medium w-20">Potency</th>
-                    <th className="pb-3 font-medium w-24">Quantity</th>
-                    <th className="pb-3 font-medium w-24">Pattern</th>
-                    <th className="pb-3 font-medium w-24">Frequency</th>
-                    <th className="pb-3 font-medium w-28">Duration</th>
-                    <th className="pb-3 font-medium w-16">Qty</th>
-                    <th className="pb-3 font-medium w-16"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prescriptions.map((rx, index) => (
-                    <tr key={index} className="border-b border-gray-50">
-                      <td className="py-2">
-                        {rx.isCombination ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenCombination(index)}
-                              className="text-blue-600 font-medium hover:underline"
-                            >
-                              {rx.combinationName}
-                            </button>
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            value={rx.medicine}
-                            onChange={(e) => updatePrescriptionRow(index, 'medicine', e.target.value)}
-                            placeholder="Medicine name"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          />
-                        )}
-                        {!rx.isCombination && (
-                          <button
-                            onClick={() => handleOpenCombination(index)}
-                            className="text-xs text-blue-500 hover:underline mt-1"
-                          >
-                            + Combination
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="text"
-                          value={rx.potency || ''}
-                          onChange={(e) => updatePrescriptionRow(index, 'potency', e.target.value)}
-                          placeholder="200"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="py-2">
-                        <select
-                          value={rx.quantity}
-                          onChange={(e) => updatePrescriptionRow(index, 'quantity', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="1dr">1dr</option>
-                          <option value="2dr">2dr</option>
-                          <option value="3dr">3dr</option>
-                          <option value="4dr">4dr</option>
-                          <option value="5dr">5dr</option>
-                          <option value="1oz">1oz</option>
-                          <option value="2oz">2oz</option>
-                          <option value="1 bottle">1 bottle</option>
-                          <option value="2 bottles">2 bottles</option>
-                        </select>
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="text"
-                          value={rx.dosePattern || ''}
-                          onChange={(e) => updatePrescriptionRow(index, 'dosePattern', e.target.value)}
-                          placeholder="1-1-1"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="py-2">
-                        <select
-                          value={rx.frequency}
-                          onChange={(e) => updatePrescriptionRow(index, 'frequency', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="Daily">Daily</option>
-                          <option value="Alternate day">Alternate</option>
-                          <option value="Weekly">Weekly</option>
-                          <option value="Monthly">Monthly</option>
-                          <option value="SOS">SOS</option>
-                          <option value="STAT">STAT</option>
-                        </select>
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="text"
-                          value={rx.duration || ''}
-                          onChange={(e) => updatePrescriptionRow(index, 'duration', e.target.value)}
-                          placeholder="7 days"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="number"
-                          value={rx.bottles || 1}
-                          onChange={(e) => updatePrescriptionRow(index, 'bottles', parseInt(e.target.value))}
-                          min={1}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="py-2">
-                        <button
-                          onClick={() => removePrescriptionRow(index)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {prescriptions.length === 0 && (
-                <div className="text-center py-8 text-gray-400">
-                  <p>No prescriptions added yet.</p>
-                  <p className="text-sm">Type medicine name or click &quot;Add Medicine&quot;</p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Additional Clinical Fields */}
-          <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-800">Additional Notes</h2>
-            </div>
-            
-            <div className="p-6 grid grid-cols-2 gap-6">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
-                <input
-                  type="text"
-                  value={diagnosis}
-                  onChange={(e) => setDiagnosis(e.target.value)}
-                  placeholder="Enter diagnosis"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Advice</label>
-                <textarea
-                  value={advice}
-                  onChange={(e) => setAdvice(e.target.value)}
-                  placeholder="Enter advice for patient"
-                  rows={2}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tests Required</label>
-                <input
-                  type="text"
-                  value={testsRequired}
-                  onChange={(e) => setTestsRequired(e.target.value)}
-                  placeholder="Enter tests if any"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Next Visit</label>
-                <div className="flex gap-2">
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Select Patient</h2>
+                <p className="text-gray-600 mb-6">Search for a patient to begin case taking</p>
+                
+                <div className="relative">
                   <input
-                    type="number"
-                    value={nextVisitDays}
-                    onChange={(e) => setNextVisitDays(e.target.value)}
-                    placeholder="Days"
-                    className="w-24 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search by name, reg number, or mobile..."
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 pl-10"
                   />
-                  <select
-                    value={nextVisit}
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select unit</option>
-                    <option value="days">Days</option>
-                    <option value="weeks">Weeks</option>
-                    <option value="months">Months</option>
-                  </select>
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  
+                  {/* Search Results Dropdown */}
+                  {showSearchResults && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
+                      {searchResults.length > 0 ? (
+                        searchResults.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => handleSelectPatient(p)}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">{p.firstName} {p.lastName}</div>
+                            <div className="text-sm text-gray-500">
+                              Reg: {p.registrationNumber} • {p.mobile} • {p.age}yrs • {p.gender}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-gray-500 text-sm">No patients found</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prognosis</label>
-                <select
-                  value={prognosis}
-                  onChange={(e) => setPrognosis(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select prognosis</option>
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="guarded">Guarded</option>
-                  <option value="poor">Poor</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks to Frontdesk</label>
-                <input
-                  type="text"
-                  value={remarksToFrontdesk}
-                  onChange={(e) => setRemarksToFrontdesk(e.target.value)}
-                  placeholder="Internal note"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
             </div>
-          </section>
-        </div>
+          </div>
+        )}
 
-        {/* Right Column - Past History & Materia Medica */}
-        <div className="w-80 space-y-6">
-          {/* Past History Panel */}
-          {showHistory && (
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800">Past History</h3>
-              </div>
-              
-              <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-                {pastVisits.map((visit, index) => (
-                  <div key={visit.id} className="border border-gray-100 rounded-lg p-3 hover:bg-gray-50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-800">
-                        Visit #{visit.visitNumber}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(visit.visitDate).toLocaleDateString()}
-                      </span>
+        {/* Patient Selected - Show Doctor Panel */}
+        {patient && (
+          <>
+            {/* Header with Patient Context */}
+            <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <h1 className="text-xl font-bold text-gray-800">Doctor Panel</h1>
+                  
+                  {/* Patient Info Card */}
+                  <div className="flex items-center gap-4 bg-blue-50 px-4 py-2 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        {patient.firstName} {patient.lastName}
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        Reg: {patient.registrationNumber} | {patient.age}yrs | {patient.gender}
+                      </p>
                     </div>
-                    {visit.chiefComplaint && (
-                      <p className="text-xs text-gray-600 mb-1">
-                        <span className="font-medium">CC:</span> {visit.chiefComplaint}
-                      </p>
-                    )}
-                    {visit.diagnosis && (
-                      <p className="text-xs text-gray-600 mb-2">
-                        <span className="font-medium">Dx:</span> {visit.diagnosis}
-                      </p>
-                    )}
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Mobile</p>
+                      <p className="text-sm font-medium">{patient.mobile}</p>
+                    </div>
                     <button
-                      onClick={() => repeatPastVisit(visit)}
-                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => {
+                        setPatient(null);
+                        router.push('/doctor-panel');
+                      }}
+                      className="ml-2 p-1 text-gray-400 hover:text-gray-600"
                     >
-                      Repeat this visit
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                     </button>
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
 
-          {/* Materia Medica Search */}
-          {showMateriaMedica && (
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800">Materia Medica</h3>
-              </div>
-              
-              <div className="p-4">
-                <input
-                  type="text"
-                  value={materiaMedicaQuery}
-                  onChange={(e) => searchMateriaMedica(e.target.value)}
-                  placeholder="Search symptoms or medicines..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 mb-4"
-                />
-                
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {/* Search results would go here */}
-                  <p className="text-sm text-gray-400 text-center py-4">
-                    Type to search materia medica...
-                  </p>
+                  {/* Visit Stats */}
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-gray-500">Visits: {pastVisits.length + 1}</span>
+                    {pastVisits[0] && (
+                      <span className="text-gray-500">
+                        Last: {new Date(pastVisits[0].visitDate).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowPharmacyQueue(!showPharmacyQueue)}
+                    className="px-4 py-2 text-sm bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100"
+                  >
+                    Pharmacy Queue ({3})
+                  </button>
+                  <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                  >
+                    {showHistory ? 'Hide' : 'Show'} History
+                  </button>
+                  <button
+                    onClick={() => setShowMateriaMedica(!showMateriaMedica)}
+                    className="px-4 py-2 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100"
+                  >
+                    Materia Medica
+                  </button>
                 </div>
               </div>
-            </section>
-          )}
+            </header>
 
-          {/* Fee Panel */}
-          <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800">Fee Details</h3>
-            </div>
-            
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Fee Amount</label>
-                <input
-                  type="number"
-                  value={feeAmount}
-                  onChange={(e) => setFeeAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Fee Type</label>
-                <select
-                  value={feeType}
-                  onChange={(e) => setFeeType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="consultation">Consultation</option>
-                  <option value="followup">Follow-up</option>
-                  <option value="special">Special</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Status</label>
-                <select
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="discounted">Discounted</option>
-                  <option value="waived">Waived</option>
-                </select>
-              </div>
-              
-              {paymentStatus === 'discounted' && (
-                <>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Discount %</label>
-                    <input
-                      type="number"
-                      value={discountPercent}
-                      onChange={(e) => setDiscountPercent(e.target.value)}
-                      placeholder="10"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    />
+            <main className="flex gap-6 p-6">
+              {/* Left Column - Case Taking */}
+              <div className="flex-1 space-y-6">
+                {/* Case Taking Section */}
+                <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-800">Case Taking</h2>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setIsSystemAssist(!isSystemAssist)}
+                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                          isSystemAssist 
+                            ? 'bg-amber-100 text-amber-700 border border-amber-300' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        System Assist {isSystemAssist ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Reason</label>
-                    <input
-                      type="text"
-                      value={discountReason}
-                      onChange={(e) => setDiscountReason(e.target.value)}
-                      placeholder="Discount reason"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  
+                  <div className="p-6">
+                    <textarea
+                      ref={caseTextRef}
+                      value={caseText}
+                      onChange={handleCaseTextChange}
+                      placeholder="Type case symptoms here...&#10;Press Enter for new symptom&#10;&#10;Example:&#10;Pain in knee joints&#10;Worse in cold weather&#10;Better by motion"
+                      className="w-full h-64 p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                     />
+                    
+                    {isSystemAssist && (
+                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-sm text-amber-700 font-medium mb-2">💡 Suggestions</p>
+                        <ul className="text-sm text-amber-600 space-y-1">
+                          <li>• Consider asking about timing (morning/evening)</li>
+                          <li>• Explore aggravating/ameliorating factors</li>
+                          <li>• Ask about appetite, thirst, sleep</li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                </>
-              )}
-            </div>
-          </section>
-        </div>
-      </main>
+                </section>
 
-      {/* End Consultation Button - Fixed Bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex justify-end gap-4">
-          <button
-            onClick={() => setShowSameDayReopenModal(true)}
-            className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleEndConsultation}
-            className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
-          >
-            End Consultation
-          </button>
-        </div>
+                {/* Prescription Table */}
+                <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-800">Prescription</h2>
+                    <button
+                      onClick={addEmptyPrescriptionRow}
+                      className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
+                    >
+                      + Add Medicine
+                    </button>
+                  </div>
+                  
+                  <div className="p-6">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-left text-sm text-gray-500 border-b border-gray-100">
+                          <th className="pb-3 font-medium">Medicine</th>
+                          <th className="pb-3 font-medium w-20">Potency</th>
+                          <th className="pb-3 font-medium w-24">Quantity</th>
+                          <th className="pb-3 font-medium w-24">Pattern</th>
+                          <th className="pb-3 font-medium w-24">Frequency</th>
+                          <th className="pb-3 font-medium w-28">Duration</th>
+                          <th className="pb-3 font-medium w-16">Qty</th>
+                          <th className="pb-3 font-medium w-16"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {prescriptions.map((rx, index) => (
+                          <tr key={index} className="border-b border-gray-50">
+                            <td className="py-2">
+                              <input
+                                type="text"
+                                value={rx.medicine}
+                                onChange={(e) => updatePrescriptionRow(index, 'medicine', e.target.value)}
+                                placeholder="Medicine name"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="text"
+                                value={rx.potency || ''}
+                                onChange={(e) => updatePrescriptionRow(index, 'potency', e.target.value)}
+                                placeholder="200"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="text"
+                                value={rx.quantity}
+                                onChange={(e) => updatePrescriptionRow(index, 'quantity', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="text"
+                                value={rx.dosePattern}
+                                onChange={(e) => updatePrescriptionRow(index, 'dosePattern', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="text"
+                                value={rx.frequency}
+                                onChange={(e) => updatePrescriptionRow(index, 'frequency', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="text"
+                                value={rx.duration || ''}
+                                onChange={(e) => updatePrescriptionRow(index, 'duration', e.target.value)}
+                                placeholder="7 days"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="number"
+                                value={rx.bottles || 1}
+                                onChange={(e) => updatePrescriptionRow(index, 'bottles', parseInt(e.target.value))}
+                                min="1"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="py-2">
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => movePrescriptionRow(index, 'up')}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  onClick={() => movePrescriptionRow(index, 'down')}
+                                  disabled={index === prescriptions.length - 1}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  onClick={() => removePrescriptionRow(index)}
+                                  className="p-1 text-red-400 hover:text-red-600"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    
+                    {prescriptions.length === 0 && (
+                      <div className="text-center py-8 text-gray-400">
+                        No prescriptions added yet. Click &quot;+ Add Medicine&quot; to start.
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Additional Notes */}
+                <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-800">Additional Notes</h2>
+                  </div>
+                  
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
+                        <input
+                          type="text"
+                          value={diagnosis}
+                          onChange={(e) => setDiagnosis(e.target.value)}
+                          placeholder="Enter diagnosis"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tests Required</label>
+                        <input
+                          type="text"
+                          value={testsRequired}
+                          onChange={(e) => setTestsRequired(e.target.value)}
+                          placeholder="Enter tests if any"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Advice</label>
+                      <textarea
+                        value={advice}
+                        onChange={(e) => setAdvice(e.target.value)}
+                        placeholder="Enter advice for the patient"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                        rows={2}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Next Visit</label>
+                        <input
+                          type="date"
+                          value={nextVisit}
+                          onChange={(e) => setNextVisit(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Or in (days)</label>
+                        <input
+                          type="number"
+                          value={nextVisitDays}
+                          onChange={(e) => setNextVisitDays(e.target.value)}
+                          placeholder="e.g., 7"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Prognosis</label>
+                        <select
+                          value={prognosis}
+                          onChange={(e) => setPrognosis(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select prognosis</option>
+                          <option value="excellent">Excellent</option>
+                          <option value="good">Good</option>
+                          <option value="fair">Fair</option>
+                          <option value="guarded">Guarded</option>
+                          <option value="poor">Poor</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Remarks to Frontdesk</label>
+                      <textarea
+                        value={remarksToFrontdesk}
+                        onChange={(e) => setRemarksToFrontdesk(e.target.value)}
+                        placeholder="Any remarks for frontdesk (e.g., fee discussion, urgent follow-up)"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* Right Column - Fee & Actions */}
+              <div className="w-80 space-y-6">
+                {/* Fee Section */}
+                <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-800">Fee Details</h2>
+                  </div>
+                  
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fee Amount (₹)</label>
+                      <input
+                        type="number"
+                        value={feeAmount}
+                        onChange={(e) => setFeeAmount(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fee Type</label>
+                      <select
+                        value={feeType}
+                        onChange={(e) => setFeeType(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="consultation">Consultation</option>
+                        <option value="followup">Follow-up</option>
+                        <option value="new">New Patient</option>
+                        <option value="emergency">Emergency</option>
+                        <option value="special">Special Consultation</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
+                      <select
+                        value={paymentStatus}
+                        onChange={(e) => setPaymentStatus(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="exempt">Exempt</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Discount (%)</label>
+                      <input
+                        type="number"
+                        value={discountPercent}
+                        onChange={(e) => setDiscountPercent(e.target.value)}
+                        placeholder="0"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Discount Reason</label>
+                      <textarea
+                        value={discountReason}
+                        onChange={(e) => setDiscountReason(e.target.value)}
+                        placeholder="Reason for discount"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Action Buttons */}
+                <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                  <div className="p-6 space-y-3">
+                    <Button
+                      onClick={() => setShowPrescriptionPreview(true)}
+                      variant="secondary"
+                      className="w-full"
+                    >
+                      Preview Prescription
+                    </Button>
+                    
+                    <Button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to end this consultation?')) {
+                          handleEndConsultation();
+                        }
+                      }}
+                      variant="primary"
+                      className="w-full"
+                    >
+                      End Consultation
+                    </Button>
+                  </div>
+                </section>
+
+                {/* Past Visits */}
+                {showHistory && pastVisits.length > 0 && (
+                  <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                    <div className="px-6 py-4 border-b border-gray-100">
+                      <h2 className="text-lg font-semibold text-gray-800">Past Visits</h2>
+                    </div>
+                    
+                    <div className="p-4 space-y-3">
+                      {pastVisits.map((visit, index) => (
+                        <div
+                          key={visit.id}
+                          className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+                          onClick={() => repeatPastVisit(visit)}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                Visit #{visit.visitNumber}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(visit.visitDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                              {visit.diagnosis || 'No diagnosis'}
+                            </span>
+                          </div>
+                          {visit.caseText && (
+                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                              {visit.caseText}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            </main>
+          </>
+        )}
       </div>
 
-      {/* Combination Modal */}
+      {/* Combination Medicine Modal */}
       {showCombinationModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Define Combination</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4">Create Combination Medicine</h3>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Combination Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Combination Name</label>
                 <input
                   type="text"
                   value={combinationName}
                   onChange={(e) => setCombinationName(e.target.value)}
-                  placeholder="e.g., JointPain"
+                  placeholder="e.g., Bioplasgen No. 10"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Content (free-text)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contents</label>
                 <textarea
                   value={combinationContent}
                   onChange={(e) => setCombinationContent(e.target.value)}
-                  placeholder="e.g., Arnica + Rhus tox + Bryonia"
-                  rows={3}
+                  placeholder="List the medicines and potencies in this combination"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
                 />
               </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCombinationModal(false)}
-                  className="flex-1 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveCombination}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Save
-                </button>
-              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => setShowCombinationModal(false)}
+                variant="secondary"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={saveCombination}
+                variant="primary"
+                className="flex-1"
+              >
+                Save
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Pharmacy Queue Panel */}
-      {showPharmacyQueue && (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-xl border-l border-gray-200 z-40">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">Pharmacy Queue</h3>
-            <button
-              onClick={() => setShowPharmacyQueue(false)}
-              className="text-gray-400 hover:text-gray-600"
+      {/* End Consultation Modal */}
+      {showEndConsultationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Consultation Completed!</h3>
+            <p className="text-gray-600 mb-6">
+              The patient&apos;s visit has been recorded successfully. The prescription has been sent to the pharmacy queue.
+            </p>
+            <Button
+              onClick={() => {
+                setShowEndConsultationModal(false);
+                setPatient(null);
+                router.push('/doctor-panel');
+              }}
+              variant="primary"
+              className="w-full"
             >
-              ✕
-            </button>
+              Start New Consultation
+            </Button>
           </div>
-          
-          <div className="p-4 space-y-3">
-            {/* Mock pharmacy items */}
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-gray-800">John Doe</span>
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Pending</span>
+        </div>
+      )}
+
+      {/* Prescription Preview Modal */}
+      {showPrescriptionPreview && patient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-8">
+              {/* Prescription Header */}
+              <div className="border-b-2 border-gray-800 pb-4 mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Dr. Homeopathic Clinic</h2>
+                <p className="text-gray-500">M.D. (Homeopathy)</p>
+                <p className="text-gray-500">Reg. No.: HM-12345</p>
               </div>
-              <p className="text-xs text-gray-600">Arnica 200, Rhus tox 200</p>
-              <div className="flex gap-2 mt-2">
-                <button className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Priority</button>
-                <button className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Stop</button>
+              
+              {/* Patient Info */}
+              <div className="flex justify-between mb-6">
+                <div>
+                  <p className="font-bold">{patient.firstName} {patient.lastName}</p>
+                  <p className="text-sm text-gray-500">Reg: {patient.registrationNumber}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">Date: {new Date().toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500">IP No.: {currentVisit?.id.slice(0, 8).toUpperCase()}</p>
+                </div>
               </div>
+              
+              {/* Vital Signs Placeholder */}
+              <div className="border border-gray-300 p-2 mb-6 text-sm">
+                <div className="grid grid-cols-4 gap-4">
+                  <div>BP: _____/_____</div>
+                  <div>Pulse: _____</div>
+                  <div>Temp: _____°F</div>
+                  <div>Weight: _____kg</div>
+                </div>
+              </div>
+              
+              {/* Case Summary */}
+              <div className="mb-6">
+                <p className="font-bold border-b border-gray-300 mb-2">Clinical Notes</p>
+                <p className="whitespace-pre-wrap">{caseText || 'No case notes recorded.'}</p>
+              </div>
+              
+              {/* Prescription */}
+              <div className="mb-6">
+                <p className="font-bold border-b border-gray-300 mb-2">Rx</p>
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="py-1">Medicine</th>
+                      <th className="py-1">Potency</th>
+                      <th className="py-1">Dose</th>
+                      <th className="py-1">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prescriptions.map((rx, index) => (
+                      <tr key={index}>
+                        <td className="py-1">
+                          {rx.isCombination ? (
+                            <span className="font-medium">{rx.combinationName}</span>
+                          ) : (
+                            rx.medicine
+                          )}
+                        </td>
+                        <td className="py-1">{rx.potency || '-'}</td>
+                        <td className="py-1">{rx.quantity} {rx.dosePattern}</td>
+                        <td className="py-1">{rx.duration}</td>
+                      </tr>
+                    ))}
+                    {prescriptions.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-gray-500">
+                          No prescriptions added
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Advice */}
+              {advice && (
+                <div className="mb-6">
+                  <p className="font-bold border-b border-gray-300 mb-2">Advice</p>
+                  <p>{advice}</p>
+                </div>
+              )}
+              
+              {/* Next Visit */}
+              {nextVisit && (
+                <div className="mb-6">
+                  <p className="font-medium">Next Visit: {new Date(nextVisit).toLocaleDateString()}</p>
+                </div>
+              )}
+              
+              {/* Footer */}
+              <div className="border-t-2 border-gray-800 pt-4 mt-8">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Consultation Fee: ₹{feeAmount}</p>
+                    {discountPercent && (
+                      <p className="text-sm text-gray-500">Discount: {discountPercent}%</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold">Dr. Signature</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 p-4 border-t border-gray-200 bg-gray-50">
+              <Button
+                onClick={() => setShowPrescriptionPreview(false)}
+                variant="secondary"
+                className="flex-1"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => window.print()}
+                variant="primary"
+                className="flex-1"
+              >
+                Print
+              </Button>
             </div>
           </div>
         </div>
@@ -948,5 +1140,3 @@ export default function DoctorPanelPage() {
     </div>
   );
 }
-
-

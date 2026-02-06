@@ -347,7 +347,7 @@ export default function AppointmentsPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {["scheduled", "confirmed"].includes(appointment.status) && (
+                      {["scheduled", "confirmed", "checked-in"].includes(appointment.status) && (
                         <>
                           <Button
                             variant="primary"
@@ -356,15 +356,20 @@ export default function AppointmentsPage() {
                           >
                             Check In
                           </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleCancel(appointment.id)}
-                          >
-                            Cancel
-                          </Button>
+                          <Link href={`/doctor-panel?patientId=${appointment.patientId}`}>
+                            <Button variant="primary" size="sm">
+                              Case Taking
+                            </Button>
+                          </Link>
                         </>
                       )}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleCancel(appointment.id)}
+                      >
+                        Cancel
+                      </Button>
                       <Link href={`/appointments/${appointment.id}`}>
                         <Button variant="secondary" size="sm">View</Button>
                       </Link>
