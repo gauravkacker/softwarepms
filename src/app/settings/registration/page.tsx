@@ -30,11 +30,20 @@ export default function RegistrationSettingsPage() {
       const settings = settingsDb.getById("registration") as { prefix?: string; startingNumber?: number; padding?: number; separator?: string; tokenMode?: string } | undefined;
       if (settings) {
         setFormData({
-          prefix: settings.prefix || "DK-",
+          prefix: settings.prefix !== undefined ? settings.prefix : "",
           startingNumber: String(settings.startingNumber || 1001),
           padding: String(settings.padding || 4),
           separator: settings.separator || "-",
           tokenMode: settings.tokenMode || "session",
+        });
+      } else {
+        // Initialize with empty prefix by default
+        setFormData({
+          prefix: "",
+          startingNumber: "1001",
+          padding: "4",
+          separator: "-",
+          tokenMode: "session",
         });
       }
       setIsLoading(false);

@@ -98,19 +98,16 @@ export default function NewAppointmentPage() {
   const displayPatients = searchQuery.trim() ? searchResults : recentPatients;
 
   // Calculate preview token number when date or slot changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (formData.date && formData.slotId) {
       const existingAppointments = appointmentDb.getBySlot(new Date(formData.date), formData.slotId);
       const previewToken = (existingAppointments.length || 0) + 1;
       setPreviewTokenNumber(previewToken);
-      // Update form token number to match preview only if not already set
-      setFormData((prev) => {
-        if (prev.tokenNumber === 0) {
-          return { ...prev, tokenNumber: previewToken };
-        }
-        return prev;
-      });
+      // Always update token number when slot or date changes
+      setFormData((prev) => ({
+        ...prev,
+        tokenNumber: previewToken,
+      }));
     }
   }, [formData.date, formData.slotId]);
 
@@ -342,32 +339,37 @@ export default function NewAppointmentPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="mb-4"
                   />
-                  <div className="max-h-60 overflow-y-auto space-y-2">
-                    {filteredPatients.map((patient) => {
-                      const p = patient as { id: string; firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedPatient(patient);
-                            setSearchQuery("");
-                          }}
-                          className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                        >
-                          <div className="font-medium text-gray-900">
-                            {p.firstName} {p.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {p.registrationNumber} • {p.mobileNumber}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {filteredPatients.length === 0 && (
-                      <p className="text-gray-500 text-center py-4">No patients found</p>
-                    )}
-                  </div>
+                  {searchQuery.trim() && (
+                    <div className="max-h-60 overflow-y-auto space-y-2">
+                      {filteredPatients.map((patient) => {
+                        const p = patient as { id: string; firstName: string; lastName: string; registrationNumber: string; mobileNumber: string };
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              setSearchQuery("");
+                            }}
+                            className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                          >
+                            <div className="font-medium text-gray-900">
+                              {p.firstName} {p.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {p.registrationNumber} • {p.mobileNumber}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {filteredPatients.length === 0 && (
+                        <p className="text-gray-500 text-center py-4">No patients found</p>
+                      )}
+                    </div>
+                  )}
+                  {!searchQuery.trim() && (
+                    <p className="text-gray-500 text-center py-4">Start typing to search for a patient</p>
+                  )}
                 </>
               ) : (
                 <div className="space-y-3">
