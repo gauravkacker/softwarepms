@@ -53,6 +53,17 @@ interface Prescription {
   combinationContent?: string;
 }
 
+interface SmartParsingRule {
+  id: string;
+  name: string;
+  type: 'quantity' | 'doseForm' | 'dosePattern' | 'duration';
+  pattern: string;
+  replacement: string;
+  isRegex: boolean;
+  priority: number;
+  isActive: boolean;
+}
+
 // Main Component
 export default function DoctorPanelPage() {
   const router = useRouter();
@@ -102,6 +113,9 @@ export default function DoctorPanelPage() {
   const [medicineSuggestions, setMedicineSuggestions] = useState<string[]>([]);
   const [showMedicineSuggestions, setShowMedicineSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  
+  // Smart parsing rules
+  const [smartParsingRules, setSmartParsingRules] = useState<SmartParsingRule[]>([]);
   
   // Common homeopathic medicines for autocomplete
   const commonMedicines = [
@@ -344,6 +358,26 @@ export default function DoctorPanelPage() {
     }
   }, [patientIdFromUrl, loadPatientData]);
 
+  // Load smart parsing rules
+  useEffect(() => {
+    const loadSmartParsingRules = async () => {
+      try {
+        const response = await fetch('/api/smart-parsing');
+        const data = await response.json();
+        if (data.success && data.data) {
+          // Filter only active rules and sort by priority
+          const activeRules = data.data
+            .filter((rule: SmartParsingRule) => rule.isActive)
+            .sort((a: SmartParsingRule, b: SmartParsingRule) => b.priority - a.priority);
+          setSmartParsingRules(activeRules);
+        }
+      } catch (error) {
+        console.error('Failed to load smart parsing rules:', error);
+      }
+    };
+    loadSmartParsingRules();
+  }, []);
+
   // ===== CASE TAKING =====
   
   const handleCaseTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -409,9 +443,10 @@ export default function DoctorPanelPage() {
     });
   };
 
-  const parseSmartEntry = (text: string): Prescription => {
-    // Smart parsing for one-line entry
-    // Example: "Arnica 200 2dr 4 pills TDS or 3 times a day or 4-4-4 for 7 days"
+  const parseSmartEntry = (text: string, existingRules: SmartParsingRule[] = []): Prescription => {
+    // Smart parsing for one-line entry using database rules
+    // Example: "Arnica 200 2dr 4 pills TDS/3 times a day for 7 days"
+    
     const parts = text.split(' ');
     
     let rx: Prescription = {
@@ -434,36 +469,142 @@ export default function DoctorPanelPage() {
       }
     }
 
-    // Parse quantity
-    const quantityMatch = text.match(/(\d+)\s*(dr|oz|bottle|pills?)/i);
-    if (quantityMatch) {
-      rx.quantity = quantityMatch[0];
-      rx.doseForm = quantityMatch[2].toLowerCase().includes('dr') ? 'drops' : 'pills';
-    }
+    // If we have database rules, use them
+    if (existingRules.length > 0) {
+      // Apply rules by type in order: quantity, doseForm, dosePattern, duration
+      const quantityRules = existingRules.filter(r => r.type === 'quantity');
+      const doseFormRules = existingRules.filter(r => r.type === 'doseForm');
+      const dosePatternRules = existingRules.filter(r => r.type === 'dosePattern');
+      const durationRules = existingRules.filter(r => r.type === 'duration');
+      
+      // Apply quantity rules
+      for (const rule of quantityRules) {
+        try {
+          const regex = rule.isRegex ? new RegExp(rule.pattern, 'i') : null;
+          if (regex && regex.test(text)) {
+            const match = text.match(regex);
+            if (match) {
+              rx.quantity = rule.replacement.replace(/\$(\d+)/g, (_, num) => match[parseInt(num)] || '');
+            }
+            break;
+          } else if (!rule.isRegex && text.toLowerCase().includes(rule.pattern.toLowerCase())) {
+            rx.quantity = rule.replacement;
+            break;
+          }
+        } catch (e) {
+          // Skip invalid regex
+        }
+      }
+      
+      // Apply dose form rules
+      for (const rule of doseFormRules) {
+        try {
+          const regex = rule.isRegex ? new RegExp(rule.pattern, 'i') : null;
+          if (regex && regex.test(text)) {
+            const match = text.match(regex);
+            if (match) {
+              rx.doseForm = rule.replacement.replace(/\$(\d+)/g, (_, num) => match[parseInt(num)] || '');
+            }
+            break;
+          } else if (!rule.isRegex && text.toLowerCase().includes(rule.pattern.toLowerCase())) {
+            rx.doseForm = rule.replacement;
+            break;
+          }
+        } catch (e) {
+          // Skip invalid regex
+        }
+      }
+      
+      // Apply dose pattern rules - handle special case for TDS with quantities
+      // Example: "4 pills TDS" should result in "4-4-4"
+      const tdsMatch = text.match(/(\d+)\s*pills?\s*TDS/i);
+      if (tdsMatch) {
+        const quantity = tdsMatch[1];
+        rx.dosePattern = `${quantity}-${quantity}-${quantity}`;
+      } else {
+        for (const rule of dosePatternRules) {
+          try {
+            const regex = rule.isRegex ? new RegExp(rule.pattern, 'i') : null;
+            if (regex && regex.test(text)) {
+              const match = text.match(regex);
+              if (match) {
+                rx.dosePattern = rule.replacement.replace(/\$(\d+)/g, (_, num) => match[parseInt(num)] || '');
+              }
+              break;
+            } else if (!rule.isRegex && text.toLowerCase().includes(rule.pattern.toLowerCase())) {
+              rx.dosePattern = rule.replacement;
+              break;
+            }
+          } catch (e) {
+            // Skip invalid regex
+          }
+        }
+      }
+      
+      // Apply duration rules
+      for (const rule of durationRules) {
+        try {
+          const regex = rule.isRegex ? new RegExp(rule.pattern, 'i') : null;
+          if (regex && regex.test(text)) {
+            const match = text.match(regex);
+            if (match) {
+              const replacement = rule.replacement.replace(/\$(\d+)/g, (_, num) => match[parseInt(num)] || '');
+              rx.duration = replacement;
+              // Calculate duration in days
+              if (replacement.toLowerCase().includes('week')) {
+                rx.durationDays = parseInt(replacement) * 7;
+              } else if (replacement.toLowerCase().includes('month')) {
+                rx.durationDays = parseInt(replacement) * 30;
+              } else {
+                rx.durationDays = parseInt(replacement);
+              }
+            }
+            break;
+          } else if (!rule.isRegex && text.toLowerCase().includes(rule.pattern.toLowerCase())) {
+            rx.duration = rule.replacement;
+            break;
+          }
+        } catch (e) {
+          // Skip invalid regex
+        }
+      }
+    } else {
+      // Fallback to basic parsing if no rules loaded
+      // Parse quantity
+      const quantityMatch = text.match(/(\d+)\s*(dr|oz|bottle|pills?)/i);
+      if (quantityMatch) {
+        rx.quantity = quantityMatch[0];
+        rx.doseForm = quantityMatch[2].toLowerCase().includes('dr') ? 'drops' : 'pills';
+      }
 
-    // Parse dose pattern (4-4-4, 1-0-1, etc)
-    const patternMatch = text.match(/(\d-\d-\d)/);
-    if (patternMatch) {
-      rx.dosePattern = patternMatch[1];
-    }
+      // Parse dose pattern (4-4-4, 1-0-1, etc)
+      const patternMatch = text.match(/(\d-\d-\d)/);
+      if (patternMatch) {
+        rx.dosePattern = patternMatch[1];
+      }
 
-    // Parse frequency
-    if (/tds|3\s*times/i.test(text)) {
-      rx.frequency = 'Daily';
-      rx.dosePattern = '1-1-1';
-    } else if (/bid|2\s*times/i.test(text)) {
-      rx.frequency = 'Daily';
-      rx.dosePattern = '1-0-1';
-    } else if (/hs|night/i.test(text)) {
-      rx.frequency = 'Daily';
-      rx.dosePattern = '0-0-1';
-    }
+      // Parse frequency with TDS special handling
+      const tdsMatch = text.match(/(\d+)\s*pills?\s*TDS/i);
+      if (tdsMatch) {
+        rx.frequency = 'Daily';
+        rx.dosePattern = `${tdsMatch[1]}-${tdsMatch[1]}-${tdsMatch[1]}`;
+      } else if (/tds|3\s*times/i.test(text)) {
+        rx.frequency = 'Daily';
+        rx.dosePattern = '1-1-1';
+      } else if (/bid|2\s*times/i.test(text)) {
+        rx.frequency = 'Daily';
+        rx.dosePattern = '1-0-1';
+      } else if (/hs|night/i.test(text)) {
+        rx.frequency = 'Daily';
+        rx.dosePattern = '0-0-1';
+      }
 
-    // Parse duration
-    const durationMatch = text.match(/(\d+)\s*(day|week|month)/i);
-    if (durationMatch) {
-      rx.duration = `${durationMatch[1]} ${durationMatch[2]}s`;
-      rx.durationDays = parseInt(durationMatch[1]) * (durationMatch[2].toLowerCase().startsWith('w') ? 7 : durationMatch[2].toLowerCase().startsWith('m') ? 30 : 1);
+      // Parse duration
+      const durationMatch = text.match(/(\d+)\s*(day|week|month)/i);
+      if (durationMatch) {
+        rx.duration = `${durationMatch[1]} ${durationMatch[2]}s`;
+        rx.durationDays = parseInt(durationMatch[1]) * (durationMatch[2].toLowerCase().startsWith('w') ? 7 : durationMatch[2].toLowerCase().startsWith('m') ? 30 : 1);
+      }
     }
 
     return rx;
@@ -496,10 +637,19 @@ export default function DoctorPanelPage() {
       // Handle Tab/Enter for navigation when suggestions are hidden
       if (e.key === 'Enter') {
         e.preventDefault();
-        // Save pattern to memory when Enter is pressed
+        // Apply smart parsing when Enter is pressed
         const rx = prescriptions[index];
         if (rx.medicine.trim()) {
-          saveMedicineToMemory(rx.medicine, rx.potency || '', rx);
+          // Parse the medicine text with smart rules
+          const parsed = parseSmartEntry(rx.medicine, smartParsingRules);
+          setPrescriptions(prev => {
+            const updated = [...prev];
+            // Only update fields that were parsed (have values)
+            if (parsed.quantity) updated[index] = { ...updated[index], ...parsed };
+            return updated;
+          });
+          // Save pattern to memory
+          saveMedicineToMemory(rx.medicine, rx.potency || '', prescriptions[index]);
         }
         // Add new row if on last row
         if (index === totalRows - 1) {
@@ -609,7 +759,7 @@ export default function DoctorPanelPage() {
   const handleSmartParse = (index: number) => {
     const rx = prescriptions[index];
     if (rx.medicine.trim()) {
-      const parsed = parseSmartEntry(rx.medicine);
+      const parsed = parseSmartEntry(rx.medicine, smartParsingRules);
       setPrescriptions(prev => {
         const updated = [...prev];
         updated[index] = { ...updated[index], ...parsed };

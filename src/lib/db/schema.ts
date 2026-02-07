@@ -118,6 +118,31 @@ export interface DoctorSetting {
   category: string;
 }
 
+// Smart Parsing Rule type
+export interface SmartParsingRule {
+  id: string;
+  name: string;
+  type: 'quantity' | 'doseForm' | 'dosePattern' | 'duration';
+  pattern: string;      // Regex or text pattern to match
+  replacement: string;  // Value to use when matched
+  isRegex: boolean;     // Whether pattern is regex
+  priority: number;     // Higher priority rules are checked first
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Smart Parsing Template
+export interface SmartParsingTemplate {
+  id: string;
+  name: string;
+  description: string;
+  rules: SmartParsingRule[];
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Type exports
 export type InsertPatient = Omit<DoctorPatient, 'id'>;
 export type SelectPatient = DoctorPatient;
@@ -135,3 +160,7 @@ export type InsertMedicineMemory = Omit<MedicineUsageMemory, 'id' | 'createdAt'>
 export type SelectMedicineMemory = MedicineUsageMemory;
 export type InsertSetting = Omit<DoctorSetting, 'id'>;
 export type SelectSetting = DoctorSetting;
+export type InsertSmartParsingRule = Omit<SmartParsingRule, 'id' | 'createdAt' | 'updatedAt'>;
+export type SelectSmartParsingRule = SmartParsingRule;
+export type InsertSmartParsingTemplate = Omit<SmartParsingTemplate, 'id' | 'createdAt' | 'updatedAt'>;
+export type SelectSmartParsingTemplate = SmartParsingTemplate;

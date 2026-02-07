@@ -119,6 +119,10 @@ class LocalDatabase {
     // System
     this.store.set('settings', []);
     this.store.set('auditLog', []);
+    
+    // Smart Parsing
+    this.store.set('smartParsingRules', []);
+    this.store.set('smartParsingTemplates', []);
   }
 
   // Generic CRUD operations
