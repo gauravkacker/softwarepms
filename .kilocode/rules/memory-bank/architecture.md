@@ -1,4 +1,4 @@
-# System Patterns: Next.js Starter Template
+# System Patterns: HomeoPMS - Homeopathic Patient Management System
 
 ## Architecture Overview
 
@@ -6,13 +6,25 @@
 src/
 ├── app/                    # Next.js App Router
 │   ├── layout.tsx          # Root layout + metadata
-│   ├── page.tsx            # Home page
+│   ├── page.tsx            # Login page
 │   ├── globals.css         # Tailwind imports + global styles
-│   └── favicon.ico         # Site icon
-└── (expand as needed)
-    ├── components/         # React components (add when needed)
-    ├── lib/                # Utilities and helpers (add when needed)
-    └── db/                 # Database files (add via recipe)
+│   ├── favicon.ico         # Site icon
+│   ├── doctor-panel/       # Main prescription interface
+│   ├── patients/           # Patient management
+│   ├── appointments/       # Appointment scheduling
+│   ├── queue/              # Queue management
+│   ├── settings/           # System settings
+│   ├── admin/              # Admin panel
+│   ├── messages/           # Messaging
+│   ├── login/              # Authentication
+│   └── api/                # API routes
+├── components/             # React components
+│   ├── ui/                 # Reusable UI components
+│   └── layout/             # Layout components (Header, Sidebar)
+├── lib/                    # Utilities and helpers
+│   ├── auth/               # Authentication
+│   └── db/                 # Database (better-sqlite3)
+└── types/                  # TypeScript types
 ```
 
 ## Key Design Patterns
@@ -22,23 +34,23 @@ src/
 Uses Next.js App Router with file-based routing:
 ```
 src/app/
-├── page.tsx           # Route: /
-├── about/page.tsx     # Route: /about
-├── blog/
-│   ├── page.tsx       # Route: /blog
-│   └── [slug]/page.tsx # Route: /blog/:slug
-└── api/
-    └── route.ts       # API Route: /api
+├── page.tsx              # Route: / (login)
+├── doctor-panel/page.tsx # Route: /doctor-panel
+├── patients/page.tsx     # Route: /patients
+├── patients/[id]/page.tsx # Route: /patients/:id
+├── appointments/page.tsx # Route: /appointments
+├── queue/page.tsx        # Route: /queue
+├── settings/page.tsx     # Route: /settings
+├── admin/page.tsx        # Route: /admin
+└── api/route.ts          # API endpoints
 ```
 
-### 2. Component Organization Pattern (When Expanding)
+### 2. Component Organization Pattern
 
 ```
 src/components/
-├── ui/                # Reusable UI components (Button, Card, etc.)
-├── layout/            # Layout components (Header, Footer)
-├── sections/          # Page sections (Hero, Features, etc.)
-└── forms/             # Form components
+├── ui/                   # Reusable UI components (Button, Card, Input, Badge, PhotoUpload)
+└── layout/               # Layout components (Header, Sidebar)
 ```
 
 ### 3. Server Components by Default
@@ -71,8 +83,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
-// src/app/dashboard/layout.tsx - Nested layout
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+// src/app/doctor-panel/layout.tsx - Nested layout
+export default function DoctorPanelLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex">
       <Sidebar />
@@ -80,6 +92,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
+```
+
+### 5. Database Pattern (better-sqlite3)
+
+```typescript
+// lib/db/database.ts
+import Database from 'better-sqlite3';
+import path from 'path';
+
+const dbPath = path.join(process.cwd(), 'data', 'clinic.db');
+export const db = new Database(dbPath);
+
+// lib/db/schema.ts - Database schema definitions
 ```
 
 ## Styling Conventions
@@ -106,15 +131,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 - Components: PascalCase (`Button.tsx`, `Header.tsx`)
 - Utilities: camelCase (`utils.ts`, `helpers.ts`)
 - Pages/Routes: lowercase (`page.tsx`, `layout.tsx`)
-- Directories: kebab-case (`api-routes/`) or lowercase (`components/`)
+- Directories: lowercase (`components/`, `lib/`)
+- API Routes: lowercase with hyphens (`combinations/route.ts`)
 
 ## State Management
 
 For simple needs:
 - `useState` for local component state
-- `useContext` for shared state
+- `useContext` for shared state (auth-context.tsx)
 - Server Components for data fetching
 
-For complex needs (add when necessary):
-- Zustand for client state
-- React Query for server state
+For complex needs:
+- Consider Zustand for client state
+- Consider React Query for server state

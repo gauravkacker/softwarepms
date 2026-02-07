@@ -1,87 +1,70 @@
-# Active Context: Next.js Starter Template
+# Active Context: HomeoPMS - Homeopathic Patient Management System
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
+**Project Status**: ✅ In Development
 
-The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. It's ready for AI-assisted expansion to build any type of application.
+A complete Homeopathic Patient Management System built with Next.js 16, featuring smart prescription parsing, combination medicine management, and comprehensive patient data handling.
 
 ## Recently Completed
 
-- [x] Base Next.js 16 setup with App Router
-- [x] TypeScript configuration with strict mode
-- [x] Tailwind CSS 4 integration
-- [x] ESLint configuration
-- [x] Memory bank documentation
-- [x] Recipe system for common features
+- [x] Cloned project from softwarepms.git
+- [x] Smart parsing feature for prescriptions
+- [x] Combination medicine button and management
+- [x] Doctor Panel with dose form column and medicine autocomplete
+- [x] Keyboard shortcuts for faster prescription entry
+- [x] System memory for prescriptions and medicines
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Global styles | ✅ Ready |
-| `.kilocode/` | AI context & recipes | ✅ Ready |
+| `src/app/doctor-panel/` | Main prescription interface | ✅ Active |
+| `src/app/patients/` | Patient management | ✅ Active |
+| `src/app/appointments/` | Appointment scheduling | ✅ Active |
+| `src/app/queue/` | Queue management | ✅ Active |
+| `src/app/settings/` | System settings | ✅ Active |
+| `src/app/admin/` | Admin panel | ✅ Active |
+| `src/lib/db/` | Database schema and utilities | ✅ Active |
 
 ## Current Focus
 
-The template is ready. Next steps depend on user requirements:
+The project is fully functional. Development continues based on user requirements:
 
-1. What type of application to build
-2. What features are needed
-3. Design/branding preferences
+1. New features and enhancements
+2. Bug fixes and optimizations
+3. User experience improvements
 
 ## Quick Start Guide
 
-### To add a new page:
+### Running the Project
 
-Create a file at `src/app/[route]/page.tsx`:
-```tsx
-export default function NewPage() {
-  return <div>New page content</div>;
-}
+```bash
+bun install    # Install dependencies
+bun dev        # Start dev server
+bun build      # Production build
+bun lint       # Run ESLint
+bun typecheck  # TypeScript checking
 ```
 
-### To add components:
+### Key Features
 
-Create `src/components/` directory and add components:
-```tsx
-// src/components/ui/Button.tsx
-export function Button({ children }: { children: React.ReactNode }) {
-  return <button className="px-4 py-2 bg-blue-600 text-white rounded">{children}</button>;
-}
-```
+- **Doctor Panel**: Smart prescription parsing with combination medicines
+- **Patient Management**: Full CRUD operations, visit history
+- **Appointments**: Schedule and manage patient visits
+- **Queue System**: Organize patient flow
+- **Settings**: Configure fees, registration, time slots
 
-### To add a database:
+## Available Pages
 
-Follow `.kilocode/recipes/add-database.md`
-
-### To add API routes:
-
-Create `src/app/api/[route]/route.ts`:
-```tsx
-import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ message: "Hello" });
-}
-```
-
-## Available Recipes
-
-| Recipe | File | Use Case |
-|--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
-
-## Pending Improvements
-
-- [ ] Add more recipes (auth, email, etc.)
-- [ ] Add example components
-- [ ] Add testing setup recipe
-
-## Session History
-
-| Date | Changes |
-|------|---------|
-| Initial | Template created with base setup |
+| Route | Purpose |
+|-------|---------|
+| `/` | Login page |
+| `/doctor-panel` | Main prescription interface |
+| `/patients` | Patient list and management |
+| `/patients/[id]` | Patient details |
+| `/appointments` | Appointment management |
+| `/queue` | Patient queue |
+| `/settings` | System settings |
+| `/admin/users` | User management |
+| `/admin/activity-log` | Activity tracking |

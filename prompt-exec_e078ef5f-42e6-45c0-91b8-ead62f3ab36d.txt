@@ -1,8 +1,0 @@
-the patient prefix issue still persist, so check again,
-
-also the patient list is now hidden, but if we are adding a new patient and then pressing the button regiter and book appointment, then it should autoselect that patient for booking, so we dont have to search again but this flow works only if we are adding a new patinet and booking the appointment at same time by pressing the button register and book appointment.
-
-Also on http://localhost:3000/patients/new page while booking a new patient, the software search duplicate enteris by first word we type in the name field, it should not be like this, instead it should match 3 fields name last name and mobile number, if all these 3 matches then show the duplicate entry possibility,
-if booking a new patient and mobile number matches the with the system, show all the patients registered to that number, then dr or staff can decide weather to book new or not...multiple patients can be booked with same mobile number
-
-kindly make the changes and update my git hub repo

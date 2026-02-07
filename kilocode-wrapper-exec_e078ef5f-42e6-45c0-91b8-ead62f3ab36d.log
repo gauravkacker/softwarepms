@@ -1,7 +1,0 @@
-2026-02-06T07:00:29.635Z wrapper args executionId=exec_e078ef5f-42e6-45c0-91b8-ead62f3ab36d mode=code promptFile=/tmp/prompt-exec_e078ef5f-42e6-45c0-91b8-ead62f3ab36d.txt
-2026-02-06T07:00:29.635Z wrapper env sessionId=agent_d0fb0484-0924-45d7-837c-9e57ddf4284f userId=6c80e0de-d370-4726-b7c6-79c6f25e6b41 workspacePath=/workspace/6c80e0de-d370-4726-b7c6-79c6f25e6b41/sessions/agent_d0fb0484-0924-45d7-837c-9e57ddf4284f
-2026-02-06T07:00:29.982Z ingest websocket open attempt=0
-2026-02-06T07:00:29.984Z ingest connection established
-2026-02-06T07:00:29.991Z prompt loaded chars=1026
-2026-02-06T07:00:29.991Z appendSystemPromptFile=/tmp/append-system-prompt-exec_e078ef5f-42e6-45c0-91b8-ead62f3ab36d.txt
-2026-02-06T07:00:30.005Z kilocode runner started
