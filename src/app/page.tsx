@@ -74,7 +74,7 @@ export default function Dashboard() {
             <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-none">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-indigo-100 text-sm">Today&apos;s Patients</p>
+                  <p className="text-indigo-100 text-sm">Today's Patients</p>
                   <p className="text-3xl font-bold mt-1">{stats.todayPatients}</p>
                 </div>
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">

@@ -68,3 +68,9 @@ bun typecheck  # TypeScript checking
 | `/settings` | System settings |
 | `/admin/users` | User management |
 | `/admin/activity-log` | Activity tracking |
+
+## Session History
+
+| Date | Changes |
+|------|---------|
+| Initial | Template created with base setup |
