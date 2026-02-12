@@ -848,6 +848,101 @@ export default function DoctorPanelPage() {
     }
   };
 
+  // ===== SAVE FEE =====
+  
+  const handleSaveFee = () => {
+    if (!patient) return;
+    
+    const feeAmountNum = parseFloat(feeAmount) || 0;
+    const discountPercentNum = parseFloat(discountPercent) || 0;
+    
+    // Update or create fee record
+    if (currentAppointmentFee?.feeId) {
+      // Update existing fee record
+      db.update('fees', currentAppointmentFee.feeId, {
+        amount: feeAmountNum,
+        feeType: feeType,
+        paymentStatus: paymentStatus,
+        discountPercent: discountPercentNum,
+        discountReason: discountReason,
+        updatedAt: new Date(),
+      });
+    } else {
+      // Create new fee record
+      const newFee = db.create('fees', {
+        patientId: patient.id,
+        amount: feeAmountNum,
+        feeType: feeType,
+        paymentStatus: paymentStatus,
+        discountPercent: discountPercentNum,
+        discountReason: discountReason,
+        paymentMethod: '',
+        notes: '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      
+      // Update current appointment fee with new fee ID
+      if (currentAppointmentFee) {
+        setCurrentAppointmentFee({
+          ...currentAppointmentFee,
+          feeId: newFee.id,
+          feeAmount: feeAmountNum,
+          feeType: feeType,
+          feeStatus: paymentStatus,
+        });
+      }
+    }
+    
+    // Update appointment if exists
+    if (currentAppointmentFee?.feeId) {
+      const appointments = appointmentDb.getAll() as Appointment[];
+      const todayAppt = appointments.find((apt: Appointment) => 
+        apt.feeId === currentAppointmentFee.feeId
+      );
+      if (todayAppt) {
+        appointmentDb.update(todayAppt.id, {
+          feeStatus: paymentStatus,
+          feeAmount: feeAmountNum,
+          feeType: feeType,
+        });
+      }
+    }
+    
+    // Update the visible fee info immediately
+    setCurrentAppointmentFee(prev => prev ? {
+      ...prev,
+      feeAmount: feeAmountNum,
+      feeType: feeType,
+      feeStatus: paymentStatus,
+    } : null);
+    
+    // Update last fee info if status is paid
+    if (paymentStatus === 'paid') {
+      setLastFeeInfo({
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        amount: feeAmountNum,
+        daysAgo: 0,
+        feeType: feeType,
+        status: 'paid',
+      });
+    } else if (paymentStatus === 'pending') {
+      setLastFeeInfo({
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        amount: feeAmountNum,
+        daysAgo: 0,
+        feeType: feeType,
+        status: 'pending',
+      });
+    }
+    
+    // Collapse the form after saving
+    setShowFeeForm(false);
+    
+    // Show success feedback (could add a toast notification here)
+    console.log('Fee saved successfully');
+  };
+
   // ===== END CONSULTATION =====
 
   const handleEndConsultation = async () => {
@@ -1728,6 +1823,17 @@ Dr. Homeopathic Clinic`);
                                 rows={2}
                               />
                             </div>
+                            
+                            {/* Save Fee Button */}
+                            <div className="pt-2">
+                              <Button
+                                onClick={handleSaveFee}
+                                variant="primary"
+                                className="w-full bg-blue-600 hover:bg-blue-700"
+                              >
+                                Save Fee Changes
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1794,6 +1900,17 @@ Dr. Homeopathic Clinic`);
                             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
                             rows={2}
                           />
+                        </div>
+                        
+                        {/* Save Fee Button for no appointment fee case */}
+                        <div className="pt-2">
+                          <Button
+                            onClick={handleSaveFee}
+                            variant="primary"
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                          >
+                            Save Fee
+                          </Button>
                         </div>
                       </>
                     )}
