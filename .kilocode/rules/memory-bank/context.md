@@ -14,6 +14,7 @@ A complete Homeopathic Patient Management System built with Next.js 16, featurin
 - [x] Doctor Panel with dose form column and medicine autocomplete
 - [x] Keyboard shortcuts for faster prescription entry
 - [x] System memory for prescriptions and medicines
+- [x] Repository re-cloned and set up for continued development (February 2026)
 
 ## Current Structure
 
@@ -26,6 +27,9 @@ A complete Homeopathic Patient Management System built with Next.js 16, featurin
 | `src/app/settings/` | System settings | ✅ Active |
 | `src/app/admin/` | Admin panel | ✅ Active |
 | `src/lib/db/` | Database schema and utilities | ✅ Active |
+| `src/components/ui/` | Reusable UI components | ✅ Active |
+| `src/components/layout/` | Layout components | ✅ Active |
+| `src/lib/auth/` | Authentication context | ✅ Active |
 
 ## Current Focus
 
@@ -40,7 +44,6 @@ The project is fully functional. Development continues based on user requirement
 ### Running the Project
 
 ```bash
-cd softwarepms
 bun install    # Install dependencies
 bun dev        # Start dev server
 bun build      # Production build
@@ -51,24 +54,36 @@ bun typecheck  # TypeScript checking
 ### Key Features
 
 - **Doctor Panel**: Smart prescription parsing with combination medicines
-- **Patient Management**: Full CRUD operations, visit history
+- **Patient Management**: Full CRUD operations, visit history, tags, import
 - **Appointments**: Schedule and manage patient visits
-- **Queue System**: Organize patient flow
-- **Settings**: Configure fees, registration, time slots
+- **Queue System**: Organize patient flow with token management
+- **Settings**: Configure fees, registration, time slots, smart parsing
+- **Admin**: User management, activity logging
 
 ## Available Pages
 
 | Route | Purpose |
 |-------|---------|
-| `/` | Login page |
+| `/` | Dashboard |
+| `/login` | Login page |
 | `/doctor-panel` | Main prescription interface |
 | `/patients` | Patient list and management |
 | `/patients/[id]` | Patient details |
+| `/patients/new` | New patient registration |
+| `/patients/import` | Import patients |
+| `/patients/tags` | Patient tags management |
 | `/appointments` | Appointment management |
+| `/appointments/new` | New appointment |
 | `/queue` | Patient queue |
+| `/queue/doctor` | Doctor queue view |
 | `/settings` | System settings |
+| `/settings/fees` | Fee configuration |
+| `/settings/slots` | Time slot configuration |
+| `/settings/registration` | Registration settings |
+| `/settings/smart-parsing` | Smart parsing rules |
 | `/admin/users` | User management |
 | `/admin/activity-log` | Activity tracking |
+| `/messages` | Staff messaging |
 
 ## Session History
 
@@ -76,3 +91,4 @@ bun typecheck  # TypeScript checking
 |------|---------|
 | Initial | Template created with base setup |
 | February 2025 | Cloned from softwarepms.git, ready for continued development |
+| February 2026 | Repository re-cloned, dependencies installed, project verified |
