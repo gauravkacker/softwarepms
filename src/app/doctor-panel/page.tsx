@@ -276,6 +276,9 @@ export default function DoctorPanelPage() {
   const [showEndConsultationModal, setShowEndConsultationModal] = useState(false);
   const [showSameDayReopenModal, setShowSameDayReopenModal] = useState(false);
   const [showPrescriptionPreview, setShowPrescriptionPreview] = useState(false);
+  const [savedVisitId, setSavedVisitId] = useState<string | null>(null);
+  const [isConsultationEnded, setIsConsultationEnded] = useState(false);
+  const [pharmacySent, setPharmacySent] = useState(false);
   
   // Refs
   const caseTextRef = useRef<HTMLTextAreaElement>(null);
@@ -837,7 +840,7 @@ export default function DoctorPanelPage() {
   const handleEndConsultation = async () => {
     if (!currentVisit || !patient) return;
 
-    // Save visit data
+    // Save visit data with locked status
     const visitData = {
       patientId: patient.id,
       visitDate: new Date(),
@@ -850,16 +853,18 @@ export default function DoctorPanelPage() {
       nextVisit: nextVisit ? new Date(nextVisit) : undefined,
       prognosis,
       remarksToFrontdesk,
-      status: 'completed' as const,
+      status: 'locked' as const, // Lock the visit
     };
 
     // Create visit record
     const savedVisit = doctorVisitDb.create(visitData);
+    setSavedVisitId(savedVisit.id);
 
     // Save prescriptions
+    const prescriptionIds: string[] = [];
     prescriptions.forEach((rx, index) => {
       if (rx.medicine.trim()) {
-        doctorPrescriptionDb.create({
+        const savedRx = doctorPrescriptionDb.create({
           visitId: savedVisit.id,
           patientId: patient.id,
           medicine: rx.medicine,
@@ -877,16 +882,8 @@ export default function DoctorPanelPage() {
           combinationName: rx.combinationName,
           combinationContent: rx.combinationContent,
         });
+        prescriptionIds.push(savedRx.id);
       }
-    });
-
-    // Add to pharmacy queue
-    pharmacyQueueDb.create({
-      visitId: savedVisit.id,
-      patientId: patient.id,
-      prescriptionIds: [],
-      priority: false,
-      status: 'pending',
     });
 
     // Save/update fee record
@@ -954,7 +951,104 @@ export default function DoctorPanelPage() {
       }
     }
 
-    setShowEndConsultationModal(true);
+    // Mark consultation as ended and show preview popup
+    setIsConsultationEnded(true);
+    setShowPrescriptionPreview(true);
+  };
+
+  // Send prescription to pharmacy queue
+  const handleSendToPharmacy = () => {
+    if (!savedVisitId || !patient) return;
+    
+    // Add to pharmacy queue
+    pharmacyQueueDb.create({
+      visitId: savedVisitId,
+      patientId: patient.id,
+      prescriptionIds: [],
+      priority: false,
+      status: 'pending',
+    });
+    
+    setPharmacySent(true);
+  };
+
+  // Reset panel for next patient
+  const handleResetPanel = () => {
+    setPatient(null);
+    setCurrentVisit(null);
+    setPrescriptions([]);
+    setCaseText('');
+    setDiagnosis('');
+    setAdvice('');
+    setTestsRequired('');
+    setNextVisit('');
+    setNextVisitDays('');
+    setPrognosis('');
+    setRemarksToFrontdesk('');
+    setFeeAmount('');
+    setFeeType('consultation');
+    setPaymentStatus('pending');
+    setDiscountPercent('');
+    setDiscountReason('');
+    setShowPrescriptionPreview(false);
+    setIsConsultationEnded(false);
+    setPharmacySent(false);
+    setSavedVisitId(null);
+    router.push('/doctor-panel');
+  };
+
+  // Handle WhatsApp share
+  const handleWhatsAppShare = () => {
+    if (!patient) return;
+    
+    const prescriptionText = prescriptions
+      .filter(rx => rx.medicine.trim())
+      .map((rx, i) => `${i + 1}. ${rx.medicine} ${rx.potency || ''} - ${rx.dosePattern} for ${rx.duration}`)
+      .join('\n');
+    
+    const message = `*Prescription from Dr. Homeopathic Clinic*
+
+Patient: ${patient.firstName} ${patient.lastName}
+Date: ${new Date().toLocaleDateString()}
+
+*Medicines:*
+${prescriptionText || 'No medicines prescribed'}
+
+${advice ? `*Advice:* ${advice}` : ''}
+${nextVisit ? `*Next Visit:* ${new Date(nextVisit).toLocaleDateString()}` : ''}
+
+Thank you for visiting!`;
+    
+    const whatsappUrl = `https://wa.me/${patient.mobile.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // Handle Email share
+  const handleEmailShare = () => {
+    if (!patient) return;
+    
+    const prescriptionText = prescriptions
+      .filter(rx => rx.medicine.trim())
+      .map((rx, i) => `${i + 1}. ${rx.medicine} ${rx.potency || ''} - ${rx.dosePattern} for ${rx.duration}`)
+      .join('\n');
+    
+    const subject = encodeURIComponent(`Your Prescription - ${new Date().toLocaleDateString()}`);
+    const body = encodeURIComponent(`Dear ${patient.firstName} ${patient.lastName},
+
+Please find your prescription below:
+
+Medicines:
+${prescriptionText || 'No medicines prescribed'}
+
+${advice ? `Advice: ${advice}` : ''}
+${nextVisit ? `Next Visit: ${new Date(nextVisit).toLocaleDateString()}` : ''}
+
+Thank you for visiting Dr. Homeopathic Clinic!
+
+Best regards,
+Dr. Homeopathic Clinic`);
+    
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
   };
 
   // ===== MATERIA MEDICA SEARCH =====
@@ -1574,13 +1668,9 @@ export default function DoctorPanelPage() {
                     </Button>
                     
                     <Button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to end this consultation?')) {
-                          handleEndConsultation();
-                        }
-                      }}
+                      onClick={handleEndConsultation}
                       variant="primary"
-                      className="w-full"
+                      className="w-full bg-green-600 hover:bg-green-700"
                     >
                       End Consultation
                     </Button>
@@ -1680,33 +1770,7 @@ export default function DoctorPanelPage() {
         </div>
       )}
 
-      {/* End Consultation Modal */}
-      {showEndConsultationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Consultation Completed!</h3>
-            <p className="text-gray-600 mb-6">
-              The patient&apos;s visit has been recorded successfully. The prescription has been sent to the pharmacy queue.
-            </p>
-            <Button
-              onClick={() => {
-                setShowEndConsultationModal(false);
-                setPatient(null);
-                router.push('/doctor-panel');
-              }}
-              variant="primary"
-              className="w-full"
-            >
-              Start New Consultation
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* End Consultation Modal - No longer needed, replaced by preview popup */}
 
       {/* Prescription Preview Modal */}
       {showPrescriptionPreview && patient && (
@@ -1728,7 +1792,7 @@ export default function DoctorPanelPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">Date: {new Date().toLocaleDateString()}</p>
-                  <p className="text-sm text-gray-500">IP No.: {currentVisit?.id.slice(0, 8).toUpperCase()}</p>
+                  <p className="text-sm text-gray-500">IP No.: {savedVisitId?.slice(0, 8).toUpperCase() || currentVisit?.id.slice(0, 8).toUpperCase()}</p>
                 </div>
               </div>
               
@@ -1817,21 +1881,91 @@ export default function DoctorPanelPage() {
               </div>
             </div>
             
-            <div className="flex gap-3 p-4 border-t border-gray-200 bg-gray-50">
-              <Button
-                onClick={() => setShowPrescriptionPreview(false)}
-                variant="secondary"
-                className="flex-1"
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => window.print()}
-                variant="primary"
-                className="flex-1"
-              >
-                Print
-              </Button>
+            {/* Action Buttons */}
+            <div className="border-t border-gray-200 bg-gray-50 p-4">
+              {isConsultationEnded && (
+                <div className="mb-3 p-2 bg-green-50 text-green-700 text-sm text-center rounded-lg flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Consultation saved and visit locked
+                  {pharmacySent && ' • Sent to pharmacy'}
+                </div>
+              )}
+              
+              <div className="flex flex-wrap gap-2 justify-center">
+                {/* Print Button */}
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  title="Print Prescription"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print
+                </button>
+                
+                {/* WhatsApp Button */}
+                <button
+                  onClick={handleWhatsAppShare}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                  title="Share via WhatsApp"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                  </svg>
+                  WhatsApp
+                </button>
+                
+                {/* Email Button */}
+                <button
+                  onClick={handleEmailShare}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  title="Share via Email"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Email
+                </button>
+                
+                {/* Send to Pharmacy Button - Only show if consultation ended and not yet sent */}
+                {isConsultationEnded && !pharmacySent && (
+                  <button
+                    onClick={handleSendToPharmacy}
+                    className="flex items-center gap-1 px-3 py-2 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                    title="Send to Pharmacy Queue"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    Send to Pharmacy
+                  </button>
+                )}
+                
+                {/* Pharmacy Sent Indicator */}
+                {pharmacySent && (
+                  <span className="flex items-center gap-1 px-3 py-2 text-sm bg-purple-200 text-purple-800 rounded-lg">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    In Pharmacy Queue
+                  </span>
+                )}
+                
+                {/* Close Button */}
+                <button
+                  onClick={isConsultationEnded ? handleResetPanel : () => setShowPrescriptionPreview(false)}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  title={isConsultationEnded ? "Close and Start New Consultation" : "Close Preview"}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  {isConsultationEnded ? 'Close & Next Patient' : 'Close'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
