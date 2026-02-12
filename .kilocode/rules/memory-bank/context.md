@@ -8,7 +8,7 @@ A complete Homeopathic Patient Management System built with Next.js 16, featurin
 
 ## Recently Completed
 
-- [x] Cloned project from softwarepms.git
+- [x] Cloned project from softwarepms.git (February 2025)
 - [x] Smart parsing feature for prescriptions
 - [x] Combination medicine button and management
 - [x] Doctor Panel with dose form column and medicine autocomplete
@@ -40,6 +40,7 @@ The project is fully functional. Development continues based on user requirement
 ### Running the Project
 
 ```bash
+cd softwarepms
 bun install    # Install dependencies
 bun dev        # Start dev server
 bun build      # Production build
@@ -74,3 +75,4 @@ bun typecheck  # TypeScript checking
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
+| February 2025 | Cloned from softwarepms.git, ready for continued development |

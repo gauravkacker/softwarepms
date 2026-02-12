@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { v4 as uuidv4 } from 'uuid';
-
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { patientDb, appointmentDb } from '@/lib/db/database';
-import type { Patient, Appointment } from '@/types';
+import { feeHistoryDb } from '@/lib/db/database';
+import { doctorVisitDb, doctorPrescriptionDb, pharmacyQueueDb } from '@/lib/db/doctor-panel';
+import { db } from '@/lib/db/database';
+import type { Patient, Appointment, FeeHistoryEntry } from '@/types';
 
 // Local types for Doctor Panel (simpler for UI state)
 interface PatientRecord {
@@ -101,6 +102,23 @@ export default function DoctorPanelPage() {
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [discountPercent, setDiscountPercent] = useState('');
   const [discountReason, setDiscountReason] = useState('');
+  
+  // Last fee paid info
+  const [lastFeeInfo, setLastFeeInfo] = useState<{
+    date: string;
+    amount: number;
+    daysAgo: number;
+    feeType: string;
+  } | null>(null);
+  
+  // Current appointment fee (from appointment booking)
+  const [currentAppointmentFee, setCurrentAppointmentFee] = useState<{
+    feeAmount: number;
+    feeType: string;
+    feeTypeId: string;
+    feeStatus: string;
+    feeId?: string;
+  } | null>(null);
   
   // Combination medicines
   const [showCombinationModal, setShowCombinationModal] = useState(false);
@@ -309,22 +327,72 @@ export default function DoctorPanelPage() {
   const loadPatientData = useCallback(async (id: string) => {
     const patientData = patientDb.getById(id) as Patient | undefined;
     
-    if (patientData) {
-      const patientRecord: PatientRecord = {
-        id: patientData.id,
-        firstName: patientData.firstName,
-        lastName: patientData.lastName,
-        mobile: patientData.mobileNumber,
-        registrationNumber: patientData.registrationNumber,
-        age: patientData.dateOfBirth ? new Date().getFullYear() - new Date(patientData.dateOfBirth).getFullYear() : undefined,
-        gender: patientData.gender,
-      };
-      setPatient(patientRecord);
+    if (!patientData) return;
+    
+    const patientRecord: PatientRecord = {
+      id: patientData.id,
+      firstName: patientData.firstName,
+      lastName: patientData.lastName,
+      mobile: patientData.mobileNumber,
+      registrationNumber: patientData.registrationNumber,
+      age: patientData.dateOfBirth ? new Date().getFullYear() - new Date(patientData.dateOfBirth).getFullYear() : undefined,
+      gender: patientData.gender,
+    };
+    setPatient(patientRecord);
+
+    // Check for today's appointment with fees
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    const appointments = appointmentDb.getByPatient(patientData.id) as Appointment[];
+    const todayAppointment = appointments.find((apt: Appointment) => {
+      const aptDate = new Date(apt.appointmentDate);
+      return aptDate >= today && aptDate <= todayEnd && 
+             (apt.status === 'checked-in' || apt.status === 'in-progress');
+    });
+    
+    if (todayAppointment) {
+      // Use appointment fees
+      const apt = todayAppointment as Appointment & { feeTypeId?: string; feeId?: string };
+      setCurrentAppointmentFee({
+        feeAmount: (todayAppointment.feeAmount as number) || 0,
+        feeType: (todayAppointment.feeType as string) || 'consultation',
+        feeTypeId: apt.feeTypeId || '',
+        feeStatus: (todayAppointment.feeStatus as string) || 'pending',
+        feeId: apt.feeId || '',
+      });
+      setFeeAmount(String((todayAppointment.feeAmount as number) || ''));
+      setFeeType((todayAppointment.feeType as string) || 'consultation');
+      setPaymentStatus((todayAppointment.feeStatus as string) || 'pending');
     }
 
-    // Check for active visit (in a real app, this would query the visit table)
+    // Get last fee paid info
+    const lastFee = feeHistoryDb.getLastByPatient(patientData.id) as FeeHistoryEntry | null;
+    if (lastFee) {
+      const paidDate = new Date(lastFee.paidDate);
+      const diffTime = Math.abs(today.getTime() - paidDate.getTime());
+      const daysAgo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const isSameDay = 
+        paidDate.getDate() === today.getDate() &&
+        paidDate.getMonth() === today.getMonth() &&
+        paidDate.getFullYear() === today.getFullYear();
+      
+      setLastFeeInfo({
+        date: paidDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        amount: lastFee.amount,
+        daysAgo: isSameDay ? 0 : daysAgo,
+        feeType: lastFee.feeType,
+      });
+    } else {
+      setLastFeeInfo(null);
+    }
+
+    // Check for active visit
     const mockActiveVisit: Visit = {
-      id: uuidv4(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       patientId: id,
       visitDate: new Date(),
       visitNumber: 1,
@@ -335,7 +403,7 @@ export default function DoctorPanelPage() {
     // Mock past visits
     setPastVisits([
       {
-        id: uuidv4(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         patientId: id,
         visitDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
         visitNumber: 1,
@@ -345,11 +413,7 @@ export default function DoctorPanelPage() {
         status: 'locked',
       },
     ]);
-
-    // Mock last fee
-    setFeeAmount('500');
-    setFeeType('consultation');
-  }, [setPatient, setCurrentVisit, setPastVisits, setFeeAmount, setFeeType]);
+  }, [setPatient, setCurrentVisit, setPastVisits, setFeeAmount, setFeeType, setPaymentStatus, setLastFeeInfo]);
 
   // Load patient from URL on mount
   useEffect(() => {
@@ -771,11 +835,11 @@ export default function DoctorPanelPage() {
   // ===== END CONSULTATION =====
 
   const handleEndConsultation = async () => {
-    if (!currentVisit) return;
+    if (!currentVisit || !patient) return;
 
     // Save visit data
     const visitData = {
-      patientId: patient!.id,
+      patientId: patient.id,
       visitDate: new Date(),
       visitNumber: currentVisit.visitNumber,
       chiefComplaint: caseText.split('\n')[0] || '',
@@ -786,12 +850,109 @@ export default function DoctorPanelPage() {
       nextVisit: nextVisit ? new Date(nextVisit) : undefined,
       prognosis,
       remarksToFrontdesk,
+      status: 'completed' as const,
     };
 
-    // TODO: API calls to save data
-    // await saveVisit(visitData);
-    // await savePrescriptions(currentVisit.id, patient!.id, prescriptions);
-    // await updateFeeStatus(feeAmount, paymentStatus, discountPercent, discountReason);
+    // Create visit record
+    const savedVisit = doctorVisitDb.create(visitData);
+
+    // Save prescriptions
+    prescriptions.forEach((rx, index) => {
+      if (rx.medicine.trim()) {
+        doctorPrescriptionDb.create({
+          visitId: savedVisit.id,
+          patientId: patient.id,
+          medicine: rx.medicine,
+          potency: rx.potency,
+          quantity: rx.quantity,
+          doseForm: rx.doseForm,
+          dosePattern: rx.dosePattern,
+          frequency: rx.frequency,
+          duration: rx.duration,
+          durationDays: rx.durationDays,
+          bottles: rx.bottles,
+          instructions: rx.instructions,
+          rowOrder: index,
+          isCombination: rx.isCombination,
+          combinationName: rx.combinationName,
+          combinationContent: rx.combinationContent,
+        });
+      }
+    });
+
+    // Add to pharmacy queue
+    pharmacyQueueDb.create({
+      visitId: savedVisit.id,
+      patientId: patient.id,
+      prescriptionIds: [],
+      priority: false,
+      status: 'pending',
+    });
+
+    // Save/update fee record
+    const feeAmountNum = parseFloat(feeAmount) || 0;
+    const discountPercentNum = parseFloat(discountPercent) || 0;
+    const finalAmount = feeAmountNum - (feeAmountNum * discountPercentNum / 100);
+    
+    if (currentAppointmentFee?.feeId) {
+      // Update existing fee record
+      db.update('fees', currentAppointmentFee.feeId, {
+        amount: feeAmountNum,
+        feeType: feeType,
+        paymentStatus: paymentStatus,
+        discountPercent: discountPercentNum,
+        discountReason: discountReason,
+        notes: remarksToFrontdesk,
+        updatedAt: new Date(),
+      });
+    } else {
+      // Create new fee record
+      db.create('fees', {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        patientId: patient.id,
+        visitId: savedVisit.id,
+        amount: feeAmountNum,
+        feeType: feeType,
+        paymentStatus: paymentStatus,
+        discountPercent: discountPercentNum,
+        discountReason: discountReason,
+        paymentMethod: '',
+        notes: remarksToFrontdesk,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    // If fee is paid, add to fee history
+    if (paymentStatus === 'paid') {
+      feeHistoryDb.create({
+        id: `fh-${Date.now()}`,
+        patientId: patient.id,
+        visitId: savedVisit.id,
+        receiptId: `RCP-${Date.now()}`,
+        feeType: feeType as 'first-visit' | 'follow-up' | 'exempt' | 'consultation' | 'medicine',
+        amount: finalAmount,
+        paymentMethod: 'cash',
+        paymentStatus: 'paid',
+        paidDate: new Date(),
+        daysSinceLastFee: lastFeeInfo ? lastFeeInfo.daysAgo : undefined,
+      });
+    }
+
+    // Update appointment fee status if exists
+    if (currentAppointmentFee?.feeId) {
+      const appointments = appointmentDb.getAll() as Appointment[];
+      const todayAppt = appointments.find((apt: Appointment) => 
+        apt.feeId === currentAppointmentFee.feeId
+      );
+      if (todayAppt) {
+        appointmentDb.update(todayAppt.id, {
+          feeStatus: paymentStatus,
+          feeAmount: feeAmountNum,
+          feeType: feeType,
+        });
+      }
+    }
 
     setShowEndConsultationModal(true);
   };
@@ -1290,6 +1451,55 @@ export default function DoctorPanelPage() {
                   </div>
                   
                   <div className="p-6 space-y-4">
+                    {/* Last Fee Paid Info */}
+                    {lastFeeInfo && (
+                      <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm font-medium text-blue-800">Last Fee Paid</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-blue-700">₹{lastFeeInfo.amount} ({lastFeeInfo.feeType})</span>
+                          <span className="text-blue-600">
+                            {lastFeeInfo.daysAgo === 0 ? 'Today' : 
+                             lastFeeInfo.daysAgo === 1 ? 'Yesterday' : 
+                             `${lastFeeInfo.daysAgo} days ago`}
+                          </span>
+                        </div>
+                        <div className="text-xs text-blue-500 mt-1">{lastFeeInfo.date}</div>
+                      </div>
+                    )}
+                    
+                    {/* Current Appointment Fee */}
+                    {currentAppointmentFee && (
+                      <div className="bg-green-50 rounded-lg p-3 mb-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm font-medium text-green-800">Appointment Fee</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-green-700">₹{currentAppointmentFee.feeAmount} ({currentAppointmentFee.feeType})</span>
+                          <span className={`px-2 py-0.5 text-xs rounded ${
+                            currentAppointmentFee.feeStatus === 'paid' ? 'bg-green-200 text-green-800' : 
+                            currentAppointmentFee.feeStatus === 'exempt' ? 'bg-purple-200 text-purple-800' :
+                            'bg-yellow-200 text-yellow-800'
+                          }`}>
+                            {currentAppointmentFee.feeStatus.charAt(0).toUpperCase() + currentAppointmentFee.feeStatus.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Fee Source Indicator */}
+                    {currentAppointmentFee && (
+                      <div className="text-xs text-gray-500 mb-2">
+                        ✓ Fees from appointment booking (editable below)
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Fee Amount (₹)</label>
                       <input

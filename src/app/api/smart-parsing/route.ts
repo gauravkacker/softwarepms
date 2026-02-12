@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/database';
 import type { SmartParsingRule } from '@/lib/db/schema';
-import { v4 as uuidv4 } from 'uuid';
+
+// Helper to generate ID
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
 
 // GET - Fetch all smart parsing rules
 export async function GET() {
@@ -25,7 +29,7 @@ export async function POST(request: Request) {
     const { name, type, pattern, replacement, isRegex, priority, isActive } = body;
     
     const newRule = {
-      id: uuidv4(),
+      id: generateId(),
       name,
       type,
       pattern,
