@@ -994,7 +994,7 @@ export default function DoctorPanelPage() {
     setIsConsultationEnded(false);
     setPharmacySent(false);
     setSavedVisitId(null);
-    router.push('/doctor-panel');
+    router.push('/queue/doctor');
   };
 
   // Handle WhatsApp share
@@ -1568,21 +1568,42 @@ Dr. Homeopathic Clinic`);
                     
                     {/* Current Appointment Fee */}
                     {currentAppointmentFee && (
-                      <div className="bg-green-50 rounded-lg p-3 mb-4">
+                      <div className={`rounded-lg p-3 mb-4 ${
+                        currentAppointmentFee.feeStatus === 'paid' ? 'bg-green-50' : 
+                        currentAppointmentFee.feeStatus === 'exempt' ? 'bg-purple-50' :
+                        'bg-amber-50'
+                      }`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg className={`w-4 h-4 ${
+                            currentAppointmentFee.feeStatus === 'paid' ? 'text-green-600' : 
+                            currentAppointmentFee.feeStatus === 'exempt' ? 'text-purple-600' :
+                            'text-amber-600'
+                          }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {currentAppointmentFee.feeStatus === 'paid' ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            )}
                           </svg>
-                          <span className="text-sm font-medium text-green-800">Appointment Fee</span>
+                          <span className={`text-sm font-medium ${
+                            currentAppointmentFee.feeStatus === 'paid' ? 'text-green-800' : 
+                            currentAppointmentFee.feeStatus === 'exempt' ? 'text-purple-800' :
+                            'text-amber-800'
+                          }`}>Appointment Fee</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-green-700">₹{currentAppointmentFee.feeAmount} ({currentAppointmentFee.feeType})</span>
+                          <span className={
+                            currentAppointmentFee.feeStatus === 'paid' ? 'text-green-700' : 
+                            currentAppointmentFee.feeStatus === 'exempt' ? 'text-purple-700' :
+                            'text-amber-700'
+                          }>₹{currentAppointmentFee.feeAmount} ({currentAppointmentFee.feeType})</span>
                           <span className={`px-2 py-0.5 text-xs rounded ${
                             currentAppointmentFee.feeStatus === 'paid' ? 'bg-green-200 text-green-800' : 
                             currentAppointmentFee.feeStatus === 'exempt' ? 'bg-purple-200 text-purple-800' :
-                            'bg-yellow-200 text-yellow-800'
+                            'bg-amber-200 text-amber-800'
                           }`}>
-                            {currentAppointmentFee.feeStatus.charAt(0).toUpperCase() + currentAppointmentFee.feeStatus.slice(1)}
+                            {currentAppointmentFee.feeStatus === 'pending' ? 'Due' : 
+                             currentAppointmentFee.feeStatus.charAt(0).toUpperCase() + currentAppointmentFee.feeStatus.slice(1)}
                           </span>
                         </div>
                       </div>
