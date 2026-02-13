@@ -139,11 +139,10 @@ export default function DoctorPanelPage() {
     feeId?: string;
   } | null>(null);
   
-  // Combination medicines
-  const [showCombinationModal, setShowCombinationModal] = useState(false);
+  // Combination medicines - now uses inline editing instead of modal
+  const [editingCombinationIndex, setEditingCombinationIndex] = useState<number | null>(null);
   const [combinationName, setCombinationName] = useState('');
   const [combinationContent, setCombinationContent] = useState('');
-  const [editingCombinationIndex, setEditingCombinationIndex] = useState<number | null>(null);
   
   // Medicine autocomplete
   const [medicineSearchQuery, setMedicineSearchQuery] = useState('');
@@ -429,29 +428,41 @@ export default function DoctorPanelPage() {
 
     // Load actual past visits from database first to calculate visit number
     const savedVisits = doctorVisitDb.getByPatient(id) as DoctorVisit[];
-    const formattedVisits: Visit[] = savedVisits
-      .filter(v => v.status === 'locked' || v.status === 'completed')
-      .map(v => ({
-        id: v.id,
-        patientId: v.patientId,
-        visitDate: v.visitDate,
-        visitNumber: v.visitNumber,
-        chiefComplaint: v.chiefComplaint,
-        caseText: v.caseText,
-        diagnosis: v.diagnosis,
-        advice: v.advice,
-        testsRequired: v.testsRequired,
-        nextVisit: v.nextVisit,
-        prognosis: v.prognosis,
-        remarksToFrontdesk: v.remarksToFrontdesk,
-        status: v.status,
-      }));
-    setPastVisits(formattedVisits);
     
-    // Calculate next visit number based on past visits
-    const nextVisitNumber = formattedVisits.length > 0 
-      ? Math.max(...formattedVisits.map(v => v.visitNumber)) + 1 
-      : 1;
+    // Sort by date (oldest first) to assign correct visit numbers
+    const sortedVisits = [...savedVisits]
+      .filter(v => v.status === 'locked' || v.status === 'completed')
+      .sort((a, b) => {
+        const dateA = a.visitDate instanceof Date ? a.visitDate.getTime() : new Date(a.visitDate).getTime();
+        const dateB = b.visitDate instanceof Date ? b.visitDate.getTime() : new Date(b.visitDate).getTime();
+        return dateA - dateB; // Oldest first
+      });
+    
+    // Assign visit numbers based on chronological order
+    const formattedVisits: Visit[] = sortedVisits.map((v, index) => ({
+      id: v.id,
+      patientId: v.patientId,
+      visitDate: v.visitDate,
+      visitNumber: index + 1, // Assign visit number based on order
+      chiefComplaint: v.chiefComplaint,
+      caseText: v.caseText,
+      diagnosis: v.diagnosis,
+      advice: v.advice,
+      testsRequired: v.testsRequired,
+      nextVisit: v.nextVisit,
+      prognosis: v.prognosis,
+      remarksToFrontdesk: v.remarksToFrontdesk,
+      status: v.status,
+    }));
+    
+    // Sort for display (newest first)
+    const displayVisits = [...formattedVisits].sort((a, b) => 
+      new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime()
+    );
+    setPastVisits(displayVisits);
+    
+    // Calculate next visit number based on past visits count
+    const nextVisitNumber = formattedVisits.length + 1;
     
     // Check for active visit
     const mockActiveVisit: Visit = {
@@ -841,10 +852,18 @@ export default function DoctorPanelPage() {
   };
 
   const handleOpenCombination = (index: number) => {
-    setEditingCombinationIndex(index);
-    setCombinationName(prescriptions[index].combinationName || prescriptions[index].medicine || '');
-    setCombinationContent(prescriptions[index].combinationContent || '');
-    setShowCombinationModal(true);
+    // Toggle inline editing for combination
+    if (editingCombinationIndex === index) {
+      // Close if already open
+      setEditingCombinationIndex(null);
+      setCombinationName('');
+      setCombinationContent('');
+    } else {
+      // Open for editing
+      setEditingCombinationIndex(index);
+      setCombinationName(prescriptions[index].combinationName || prescriptions[index].medicine || '');
+      setCombinationContent(prescriptions[index].combinationContent || '');
+    }
   };
 
   const saveCombination = () => {
@@ -861,7 +880,12 @@ export default function DoctorPanelPage() {
         return updated;
       });
     }
-    setShowCombinationModal(false);
+    setEditingCombinationIndex(null);
+    setCombinationName('');
+    setCombinationContent('');
+  };
+
+  const cancelCombination = () => {
     setEditingCombinationIndex(null);
     setCombinationName('');
     setCombinationContent('');
@@ -1444,10 +1468,10 @@ Dr. Homeopathic Clinic`);
             <div class="section-title">Prescription</div>
             <table>
               <thead>
-                <tr><th>Medicine</th><th>Potency</th><th>Dose</th><th>Duration</th></tr>
+                <tr><th>Medicine</th><th>Potency</th><th>Dose Form</th><th>Pattern</th><th>Frequency</th><th>Duration</th></tr>
               </thead>
               <tbody>
-                ${visitRx.map(rx => `<tr><td>${rx.medicine}</td><td>${rx.potency || '-'}</td><td>${rx.dosePattern}</td><td>${rx.duration}</td></tr>`).join('')}
+                ${visitRx.map(rx => `<tr><td>${rx.isCombination ? rx.combinationName + ' (Combo)' : rx.medicine}</td><td>${rx.potency || '-'}</td><td>${rx.doseForm || '-'}</td><td>${rx.dosePattern || '-'}</td><td>${rx.frequency || '-'}</td><td>${rx.duration || '-'}</td></tr>`).join('')}
               </tbody>
             </table>
           </div>
@@ -1748,10 +1772,10 @@ Dr. Homeopathic Clinic`);
                               <div className="flex gap-1 mt-1">
                                 <button
                                   onClick={() => handleOpenCombination(index)}
-                                  className="text-xs px-2 py-0.5 bg-purple-50 text-purple-600 rounded hover:bg-purple-100"
+                                  className={`text-xs px-2 py-0.5 rounded ${rx.isCombination ? 'bg-purple-100 text-purple-700' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}
                                   title="Create Combination"
                                 >
-                                  + Combo
+                                  {rx.isCombination ? '✓ Combo' : '+ Combo'}
                                 </button>
                                 <button
                                   onClick={() => handleSmartParse(index)}
@@ -1761,13 +1785,44 @@ Dr. Homeopathic Clinic`);
                                   Smart
                                 </button>
                               </div>
-                              {/* Combination indicator */}
-                              {rx.isCombination && (
-                                <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                  </svg>
-                                  {rx.combinationName}
+                              {/* Combination indicator - always show content if exists */}
+                              {rx.isCombination && rx.combinationContent && (
+                                <div className="text-xs text-gray-600 mt-1 bg-purple-50 p-2 rounded border border-purple-100">
+                                  <span className="font-medium text-purple-700">{rx.combinationName}:</span>
+                                  <span className="ml-1">{rx.combinationContent}</span>
+                                </div>
+                              )}
+                              {/* Inline combination editor */}
+                              {editingCombinationIndex === index && (
+                                <div className="mt-2 p-3 bg-purple-50 rounded-lg border border-purple-200 space-y-2">
+                                  <input
+                                    type="text"
+                                    value={combinationName}
+                                    onChange={(e) => setCombinationName(e.target.value)}
+                                    placeholder="Combination Name (e.g., Bioplasgen No. 10)"
+                                    className="w-full px-2 py-1 text-sm border border-purple-200 rounded focus:ring-2 focus:ring-purple-500"
+                                  />
+                                  <textarea
+                                    value={combinationContent}
+                                    onChange={(e) => setCombinationContent(e.target.value)}
+                                    placeholder="List the medicines and potencies..."
+                                    className="w-full px-2 py-1 text-sm border border-purple-200 rounded focus:ring-2 focus:ring-purple-500 resize-none"
+                                    rows={2}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={saveCombination}
+                                      className="text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={cancelCombination}
+                                      className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </td>
@@ -2535,7 +2590,9 @@ Dr. Homeopathic Clinic`);
                                   <tr className="bg-gray-50">
                                     <th className="px-3 py-2 text-left font-medium text-gray-600">Medicine</th>
                                     <th className="px-3 py-2 text-left font-medium text-gray-600 w-16">Potency</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-20">Dose</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-20">Dose Form</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-20">Pattern</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-20">Frequency</th>
                                     <th className="px-3 py-2 text-left font-medium text-gray-600 w-24">Duration</th>
                                   </tr>
                                 </thead>
@@ -2544,13 +2601,20 @@ Dr. Homeopathic Clinic`);
                                     <tr key={idx} className="border-t border-gray-100">
                                       <td className="px-3 py-2">
                                         {rx.isCombination ? (
-                                          <span className="text-purple-600 font-medium">{rx.combinationName || rx.medicine}</span>
+                                          <div>
+                                            <span className="text-purple-600 font-medium">{rx.combinationName || rx.medicine}</span>
+                                            {rx.combinationContent && (
+                                              <div className="text-xs text-gray-500 mt-1">{rx.combinationContent}</div>
+                                            )}
+                                          </div>
                                         ) : (
                                           rx.medicine
                                         )}
                                       </td>
                                       <td className="px-3 py-2 text-gray-600">{rx.potency || '-'}</td>
+                                      <td className="px-3 py-2 text-gray-600">{rx.doseForm || '-'}</td>
                                       <td className="px-3 py-2 text-gray-600">{rx.dosePattern || '-'}</td>
+                                      <td className="px-3 py-2 text-gray-600">{rx.frequency || '-'}</td>
                                       <td className="px-3 py-2 text-gray-600">{rx.duration || '-'}</td>
                                     </tr>
                                   ))}
@@ -2622,55 +2686,7 @@ Dr. Homeopathic Clinic`);
         </div>
       )}
 
-      {/* Combination Medicine Modal */}
-      {showCombinationModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Create Combination Medicine</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Combination Name</label>
-                <input
-                  type="text"
-                  value={combinationName}
-                  onChange={(e) => setCombinationName(e.target.value)}
-                  placeholder="e.g., Bioplasgen No. 10"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contents</label>
-                <textarea
-                  value={combinationContent}
-                  onChange={(e) => setCombinationContent(e.target.value)}
-                  placeholder="List the medicines and potencies in this combination"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={3}
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <Button
-                onClick={() => setShowCombinationModal(false)}
-                variant="secondary"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={saveCombination}
-                variant="primary"
-                className="flex-1"
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Combination Medicine Modal - Removed, now using inline editor */}
 
       {/* End Consultation Modal - No longer needed, replaced by preview popup */}
 
