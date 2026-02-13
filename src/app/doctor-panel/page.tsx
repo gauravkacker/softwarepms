@@ -10,6 +10,7 @@ import { feeHistoryDb } from '@/lib/db/database';
 import { doctorVisitDb, doctorPrescriptionDb, pharmacyQueueDb } from '@/lib/db/doctor-panel';
 import { db } from '@/lib/db/database';
 import type { Patient, Appointment, FeeHistoryEntry } from '@/types';
+import type { DoctorVisit } from '@/lib/db/schema';
 
 // Local types for Doctor Panel (simpler for UI state)
 interface PatientRecord {
@@ -436,19 +437,26 @@ export default function DoctorPanelPage() {
     };
     setCurrentVisit(mockActiveVisit);
     
-    // Mock past visits
-    setPastVisits([
-      {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        patientId: id,
-        visitDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        visitNumber: 1,
-        chiefComplaint: 'Headache',
-        caseText: 'Severe headache since morning',
-        diagnosis: 'Tension headache',
-        status: 'locked',
-      },
-    ]);
+    // Load actual past visits from database
+    const savedVisits = doctorVisitDb.getByPatient(id) as DoctorVisit[];
+    const formattedVisits: Visit[] = savedVisits
+      .filter(v => v.status === 'locked' || v.status === 'completed')
+      .map(v => ({
+        id: v.id,
+        patientId: v.patientId,
+        visitDate: v.visitDate,
+        visitNumber: v.visitNumber,
+        chiefComplaint: v.chiefComplaint,
+        caseText: v.caseText,
+        diagnosis: v.diagnosis,
+        advice: v.advice,
+        testsRequired: v.testsRequired,
+        nextVisit: v.nextVisit,
+        prognosis: v.prognosis,
+        remarksToFrontdesk: v.remarksToFrontdesk,
+        status: v.status,
+      }));
+    setPastVisits(formattedVisits);
   }, [setPatient, setCurrentVisit, setPastVisits, setFeeAmount, setFeeType, setPaymentStatus, setLastFeeInfo]);
 
   // Load patient from URL on mount
