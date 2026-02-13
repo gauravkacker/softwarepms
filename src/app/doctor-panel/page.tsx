@@ -777,8 +777,11 @@ export default function DoctorPanelPage() {
       setShowMedicineSuggestions(true);
       setSelectedSuggestionIndex(-1);
     } else {
-      setMedicineSuggestions([]);
-      setShowMedicineSuggestions(false);
+      // Show all medicines when field is empty
+      const allMeds = [...new Set([...getCustomMedicines(), ...getCombinationNames(), ...commonMedicines])].slice(0, 10);
+      setMedicineSuggestions(allMeds);
+      setShowMedicineSuggestions(true);
+      setSelectedSuggestionIndex(-1);
     }
   };
   
@@ -794,8 +797,11 @@ export default function DoctorPanelPage() {
       // If suggestions are shown and one is selected, select it
       if (showMedicineSuggestions && selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
         selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
+      } else if (showMedicineSuggestions && medicineSuggestions.length > 0) {
+        // If suggestions are shown but none selected, select the first one
+        selectMedicine(index, medicineSuggestions[0]);
       } else {
-        // No suggestion selected - try to load saved pattern for the entered medicine
+        // No suggestions - try to load saved pattern for the entered medicine
         const rx = prescriptions[index];
         if (rx.medicine.trim()) {
           // First try to load saved pattern from memory
@@ -877,7 +883,21 @@ export default function DoctorPanelPage() {
     setFocusedMedicineIndex(null);
     
     // Try to load saved pattern for this medicine
-    loadSavedPattern(index, medicine, '');
+    const savedPattern = getMedicinePattern(medicine, '');
+    if (savedPattern) {
+      setPrescriptions(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          quantity: savedPattern.quantity,
+          doseForm: savedPattern.doseForm,
+          dosePattern: savedPattern.dosePattern,
+          frequency: savedPattern.frequency,
+          duration: savedPattern.duration,
+        };
+        return updated;
+      });
+    }
   };
   
   const handlePotencyKeyDown = (
@@ -1800,11 +1820,17 @@ Dr. Homeopathic Clinic`);
                                     onKeyDown={(e) => handleMedicineKeyDown(e, index, prescriptions.length)}
                                     onFocus={() => {
                                       setFocusedMedicineIndex(index);
+                                      // Show suggestions when field is focused
                                       if (rx.medicine.trim().length > 0) {
                                         const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
                                         setMedicineSuggestions(suggestions);
-                                        setShowMedicineSuggestions(true);
+                                      } else {
+                                        // Show all medicines when field is empty
+                                        const allMeds = [...new Set([...getCustomMedicines(), ...getCombinationNames(), ...commonMedicines])].slice(0, 10);
+                                        setMedicineSuggestions(allMeds);
                                       }
+                                      setShowMedicineSuggestions(true);
+                                      setSelectedSuggestionIndex(-1);
                                     }}
                                     onBlur={() => {
                                       // Delay hiding to allow click on suggestion
