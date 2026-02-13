@@ -1727,71 +1727,68 @@ Dr. Homeopathic Clinic`);
                         {prescriptions.map((rx, index) => (
                           <tr key={index} className="border-b border-gray-50">
                             <td className="py-2 relative">
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  value={rx.medicine}
-                                  onChange={(e) => handleMedicineSearchChange(index, e.target.value)}
-                                  onKeyDown={(e) => handleMedicineKeyDown(e, index, prescriptions.length)}
-                                  onFocus={() => {
-                                    if (rx.medicine.trim().length > 0) {
-                                      const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
-                                      setMedicineSuggestions(suggestions);
-                                      setShowMedicineSuggestions(true);
-                                    }
-                                  }}
-                                  onBlur={() => {
-                                    // Delay hiding to allow click on suggestion
-                                    setTimeout(() => {
-                                      setShowMedicineSuggestions(false);
-                                    }, 200);
-                                  }}
-                                  placeholder="Medicine name"
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                  autoComplete="off"
-                                />
-                                
-                                {/* Autocomplete Dropdown */}
-                                {showMedicineSuggestions && medicineSuggestions.length > 0 && (
-                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
-                                    {medicineSuggestions.map((suggestion, i) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => selectMedicine(index, suggestion)}
-                                        className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                                          i === selectedSuggestionIndex ? 'bg-blue-50 text-blue-700' : ''
-                                        }`}
-                                      >
-                                        {suggestion}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              {/* Medicine action buttons */}
-                              <div className="flex gap-1 mt-1">
+                              <div className="relative flex items-center gap-1">
+                                {/* + button for combination */}
                                 <button
                                   onClick={() => handleOpenCombination(index)}
-                                  className={`text-xs px-2 py-0.5 rounded ${rx.isCombination ? 'bg-purple-100 text-purple-700' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}
-                                  title="Create Combination"
+                                  className={`shrink-0 w-7 h-7 flex items-center justify-center rounded text-sm font-bold ${
+                                    rx.isCombination 
+                                      ? 'bg-purple-500 text-white' 
+                                      : 'bg-gray-100 text-gray-500 hover:bg-purple-100 hover:text-purple-600'
+                                  }`}
+                                  title="Add Combination"
                                 >
-                                  {rx.isCombination ? '✓ Combo' : '+ Combo'}
+                                  +
                                 </button>
-                                <button
-                                  onClick={() => handleSmartParse(index)}
-                                  className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded hover:bg-green-100"
-                                  title="Smart Parse"
-                                >
-                                  Smart
-                                </button>
-                              </div>
-                              {/* Combination indicator - always show content if exists */}
-                              {rx.isCombination && rx.combinationContent && (
-                                <div className="text-xs text-gray-600 mt-1 bg-purple-50 p-2 rounded border border-purple-100">
-                                  <span className="font-medium text-purple-700">{rx.combinationName}:</span>
-                                  <span className="ml-1">{rx.combinationContent}</span>
+                                <div className="flex-1 relative">
+                                  <input
+                                    type="text"
+                                    value={rx.medicine}
+                                    onChange={(e) => handleMedicineSearchChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleMedicineKeyDown(e, index, prescriptions.length)}
+                                    onFocus={() => {
+                                      if (rx.medicine.trim().length > 0) {
+                                        const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
+                                        setMedicineSuggestions(suggestions);
+                                        setShowMedicineSuggestions(true);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      // Delay hiding to allow click on suggestion
+                                      setTimeout(() => {
+                                        setShowMedicineSuggestions(false);
+                                      }, 200);
+                                    }}
+                                    placeholder="Medicine name"
+                                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                                      rx.isCombination ? 'border-purple-300 bg-purple-50' : 'border-gray-200'
+                                    }`}
+                                    autoComplete="off"
+                                  />
+                                  {/* Autocomplete Dropdown */}
+                                  {showMedicineSuggestions && medicineSuggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
+                                      {medicineSuggestions.map((suggestion, i) => (
+                                        <button
+                                          key={i}
+                                          onClick={() => selectMedicine(index, suggestion)}
+                                          className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
+                                            i === selectedSuggestionIndex ? 'bg-blue-50 text-blue-700' : ''
+                                          }`}
+                                        >
+                                          {suggestion}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {/* Combination details shown below in same field */}
+                                  {rx.isCombination && rx.combinationContent && (
+                                    <div className="mt-1 pt-1 border-t border-purple-200 text-xs text-gray-500">
+                                      {rx.combinationContent}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </div>
                               {/* Inline combination editor */}
                               {editingCombinationIndex === index && (
                                 <div className="mt-2 p-3 bg-purple-50 rounded-lg border border-purple-200 space-y-2">
