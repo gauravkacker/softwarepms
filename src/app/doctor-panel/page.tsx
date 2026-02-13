@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/Button';
@@ -95,6 +95,22 @@ export default function DoctorPanelPage() {
   const [nextVisitDays, setNextVisitDays] = useState('');
   const [prognosis, setPrognosis] = useState('');
   const [remarksToFrontdesk, setRemarksToFrontdesk] = useState('');
+  
+  // Additional notes form state
+  const [showAdditionalNotes, setShowAdditionalNotes] = useState(false);
+  
+  // Field order for additional notes (persisted to localStorage)
+  const [additionalNotesFieldOrder, setAdditionalNotesFieldOrder] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('doctor_panel_field_order');
+        return saved ? JSON.parse(saved) : ['diagnosis', 'testsRequired', 'advice', 'prognosis', 'remarksToFrontdesk'];
+      } catch {
+        return ['diagnosis', 'testsRequired', 'advice', 'prognosis', 'remarksToFrontdesk'];
+      }
+    }
+    return ['diagnosis', 'testsRequired', 'advice', 'prognosis', 'remarksToFrontdesk'];
+  });
   
   // Fee editing
   const [feeAmount, setFeeAmount] = useState('');
@@ -969,6 +985,64 @@ export default function DoctorPanelPage() {
     console.log('Fee saved successfully');
   };
 
+  // ===== NEXT VISIT CALCULATIONS =====
+  
+  // Calculate next visit date from days
+  const handleNextVisitDaysChange = (days: string) => {
+    setNextVisitDays(days);
+    const daysNum = parseInt(days);
+    if (!isNaN(daysNum) && daysNum > 0) {
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + daysNum);
+      setNextVisit(nextDate.toISOString().split('T')[0]);
+    }
+  };
+  
+  // Calculate days from next visit date
+  const handleNextVisitDateChange = (date: string) => {
+    setNextVisit(date);
+    if (date) {
+      const nextDate = new Date(date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffTime = nextDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) {
+        setNextVisitDays(String(diffDays));
+      } else {
+        setNextVisitDays('');
+      }
+    }
+  };
+  
+  // Save field order to localStorage
+  const saveFieldOrder = (newOrder: string[]) => {
+    setAdditionalNotesFieldOrder(newOrder);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('doctor_panel_field_order', JSON.stringify(newOrder));
+    }
+  };
+  
+  // Move field up in order
+  const moveFieldUp = (field: string) => {
+    const currentIndex = additionalNotesFieldOrder.indexOf(field);
+    if (currentIndex > 0) {
+      const newOrder = [...additionalNotesFieldOrder];
+      [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
+      saveFieldOrder(newOrder);
+    }
+  };
+  
+  // Move field down in order
+  const moveFieldDown = (field: string) => {
+    const currentIndex = additionalNotesFieldOrder.indexOf(field);
+    if (currentIndex < additionalNotesFieldOrder.length - 1) {
+      const newOrder = [...additionalNotesFieldOrder];
+      [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
+      saveFieldOrder(newOrder);
+    }
+  };
+
   // ===== END CONSULTATION =====
 
   const handleEndConsultation = async () => {
@@ -1578,54 +1652,20 @@ Dr. Homeopathic Clinic`);
                   </div>
                 </section>
 
-                {/* Additional Notes */}
+                {/* Next Visit Section - Outside Additional Notes */}
                 <section className="bg-white rounded-xl shadow-sm border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800">Additional Notes</h2>
+                    <h2 className="text-lg font-semibold text-gray-800">Next Visit</h2>
                   </div>
                   
-                  <div className="p-6 space-y-4">
+                  <div className="p-6">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
-                        <input
-                          type="text"
-                          value={diagnosis}
-                          onChange={(e) => setDiagnosis(e.target.value)}
-                          placeholder="Enter diagnosis"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tests Required</label>
-                        <input
-                          type="text"
-                          value={testsRequired}
-                          onChange={(e) => setTestsRequired(e.target.value)}
-                          placeholder="Enter tests if any"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Advice</label>
-                      <textarea
-                        value={advice}
-                        onChange={(e) => setAdvice(e.target.value)}
-                        placeholder="Enter advice for the patient"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                        rows={2}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Next Visit</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Next Visit Date</label>
                         <input
                           type="date"
                           value={nextVisit}
-                          onChange={(e) => setNextVisit(e.target.value)}
+                          onChange={(e) => handleNextVisitDateChange(e.target.value)}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
@@ -1634,39 +1674,223 @@ Dr. Homeopathic Clinic`);
                         <input
                           type="number"
                           value={nextVisitDays}
-                          onChange={(e) => setNextVisitDays(e.target.value)}
+                          onChange={(e) => handleNextVisitDaysChange(e.target.value)}
                           placeholder="e.g., 7"
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Prognosis</label>
-                        <select
-                          value={prognosis}
-                          onChange={(e) => setPrognosis(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select prognosis</option>
-                          <option value="excellent">Excellent</option>
-                          <option value="good">Good</option>
-                          <option value="fair">Fair</option>
-                          <option value="guarded">Guarded</option>
-                          <option value="poor">Poor</option>
-                        </select>
+                    </div>
+                    {nextVisit && (
+                      <div className="mt-3 text-sm text-gray-500">
+                        Next appointment: {new Date(nextVisit).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
                       </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Remarks to Frontdesk</label>
-                      <textarea
-                        value={remarksToFrontdesk}
-                        onChange={(e) => setRemarksToFrontdesk(e.target.value)}
-                        placeholder="Any remarks for frontdesk (e.g., fee discussion, urgent follow-up)"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-                        rows={2}
-                      />
-                    </div>
+                    )}
                   </div>
+                </section>
+
+                {/* Additional Notes - Collapsible */}
+                <section className="bg-white rounded-xl shadow-sm border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdditionalNotes(!showAdditionalNotes)}
+                    className="w-full px-6 py-4 flex items-center justify-between border-b border-gray-100"
+                  >
+                    <h2 className="text-lg font-semibold text-gray-800">Additional Notes</h2>
+                    <svg 
+                      className={`w-5 h-5 text-gray-500 transition-transform ${showAdditionalNotes ? 'rotate-180' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {showAdditionalNotes && (
+                    <div className="p-6 space-y-4">
+                      {/* Render fields in saved order */}
+                      {additionalNotesFieldOrder.map((field, index) => {
+                        const fieldComponents: Record<string, React.ReactNode> = {
+                          diagnosis: (
+                            <div key="diagnosis" className="flex items-start gap-2">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
+                                <input
+                                  type="text"
+                                  value={diagnosis}
+                                  onChange={(e) => setDiagnosis(e.target.value)}
+                                  placeholder="Enter diagnosis"
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldUp('diagnosis')}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move up"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldDown('diagnosis')}
+                                  disabled={index === additionalNotesFieldOrder.length - 1}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move down"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                          testsRequired: (
+                            <div key="testsRequired" className="flex items-start gap-2">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tests Required</label>
+                                <input
+                                  type="text"
+                                  value={testsRequired}
+                                  onChange={(e) => setTestsRequired(e.target.value)}
+                                  placeholder="Enter tests if any"
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldUp('testsRequired')}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move up"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldDown('testsRequired')}
+                                  disabled={index === additionalNotesFieldOrder.length - 1}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move down"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                          advice: (
+                            <div key="advice" className="flex items-start gap-2">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Advice</label>
+                                <textarea
+                                  value={advice}
+                                  onChange={(e) => setAdvice(e.target.value)}
+                                  placeholder="Enter advice for the patient"
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                                  rows={2}
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldUp('advice')}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move up"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldDown('advice')}
+                                  disabled={index === additionalNotesFieldOrder.length - 1}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move down"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                          prognosis: (
+                            <div key="prognosis" className="flex items-start gap-2">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Prognosis</label>
+                                <select
+                                  value={prognosis}
+                                  onChange={(e) => setPrognosis(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                >
+                                  <option value="">Select prognosis</option>
+                                  <option value="excellent">Excellent</option>
+                                  <option value="good">Good</option>
+                                  <option value="fair">Fair</option>
+                                  <option value="guarded">Guarded</option>
+                                  <option value="poor">Poor</option>
+                                </select>
+                              </div>
+                              <div className="flex flex-col gap-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldUp('prognosis')}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move up"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldDown('prognosis')}
+                                  disabled={index === additionalNotesFieldOrder.length - 1}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move down"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                          remarksToFrontdesk: (
+                            <div key="remarksToFrontdesk" className="flex items-start gap-2">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks to Frontdesk</label>
+                                <textarea
+                                  value={remarksToFrontdesk}
+                                  onChange={(e) => setRemarksToFrontdesk(e.target.value)}
+                                  placeholder="Any remarks for frontdesk (e.g., fee discussion, urgent follow-up)"
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                                  rows={2}
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldUp('remarksToFrontdesk')}
+                                  disabled={index === 0}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move up"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveFieldDown('remarksToFrontdesk')}
+                                  disabled={index === additionalNotesFieldOrder.length - 1}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                  title="Move down"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                            </div>
+                          ),
+                        };
+                        return fieldComponents[field];
+                      })}
+                    </div>
+                  )}
                 </section>
               </div>
 
