@@ -856,10 +856,25 @@ export default function DoctorPanelPage() {
     const feeAmountNum = parseFloat(feeAmount) || 0;
     const discountPercentNum = parseFloat(discountPercent) || 0;
     
+    // Find today's appointment for this patient
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    const appointments = appointmentDb.getByPatient(patient.id) as Appointment[];
+    const todayAppointment = appointments.find((apt: Appointment) => {
+      const aptDate = new Date(apt.appointmentDate);
+      return aptDate >= today && aptDate <= todayEnd && 
+             (apt.status === 'checked-in' || apt.status === 'in-progress');
+    });
+    
     // Update or create fee record
-    if (currentAppointmentFee?.feeId) {
+    let feeRecordId = currentAppointmentFee?.feeId;
+    
+    if (feeRecordId) {
       // Update existing fee record
-      db.update('fees', currentAppointmentFee.feeId, {
+      db.update('fees', feeRecordId, {
         amount: feeAmountNum,
         feeType: feeType,
         paymentStatus: paymentStatus,
@@ -881,43 +896,29 @@ export default function DoctorPanelPage() {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      
-      // Update current appointment fee with new fee ID
-      if (currentAppointmentFee) {
-        setCurrentAppointmentFee({
-          ...currentAppointmentFee,
-          feeId: newFee.id,
-          feeAmount: feeAmountNum,
-          feeType: feeType,
-          feeStatus: paymentStatus,
-        });
-      }
+      feeRecordId = newFee.id;
     }
     
-    // Update appointment if exists
-    if (currentAppointmentFee?.feeId) {
-      const appointments = appointmentDb.getAll() as Appointment[];
-      const todayAppt = appointments.find((apt: Appointment) => 
-        apt.feeId === currentAppointmentFee.feeId
-      );
-      if (todayAppt) {
-        appointmentDb.update(todayAppt.id, {
-          feeStatus: paymentStatus,
-          feeAmount: feeAmountNum,
-          feeType: feeType,
-        });
-      }
+    // Update the appointment with new fee information
+    if (todayAppointment) {
+      appointmentDb.update(todayAppointment.id, {
+        feeStatus: paymentStatus,
+        feeAmount: feeAmountNum,
+        feeType: feeType,
+        feeId: feeRecordId,
+      });
     }
     
     // Update the visible fee info immediately
     setCurrentAppointmentFee(prev => prev ? {
       ...prev,
+      feeId: feeRecordId,
       feeAmount: feeAmountNum,
       feeType: feeType,
       feeStatus: paymentStatus,
     } : null);
     
-    // Update last fee info if status is paid
+    // Update last fee info based on payment status
     if (paymentStatus === 'paid') {
       setLastFeeInfo({
         date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -926,6 +927,28 @@ export default function DoctorPanelPage() {
         feeType: feeType,
         status: 'paid',
       });
+      
+      // Add to fee history when paid
+      const existingFeeHistory = db.getAll('feeHistory') as FeeHistoryEntry[];
+      const todayFeeHistory = existingFeeHistory.find((fh) => 
+        fh.patientId === patient.id && 
+        fh.visitId === todayAppointment?.id
+      );
+      
+      if (!todayFeeHistory) {
+        feeHistoryDb.create({
+          id: `fh-${Date.now()}`,
+          patientId: patient.id,
+          visitId: todayAppointment?.id,
+          receiptId: `RCP-${Date.now()}`,
+          feeType: feeType as 'first-visit' | 'follow-up' | 'exempt' | 'consultation' | 'medicine',
+          amount: feeAmountNum,
+          paymentMethod: 'cash',
+          paymentStatus: 'paid',
+          paidDate: new Date(),
+          daysSinceLastFee: lastFeeInfo ? lastFeeInfo.daysAgo : undefined,
+        });
+      }
     } else if (paymentStatus === 'pending') {
       setLastFeeInfo({
         date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -934,6 +957,9 @@ export default function DoctorPanelPage() {
         feeType: feeType,
         status: 'pending',
       });
+    } else if (paymentStatus === 'exempt') {
+      // For exempt status, clear the last fee info or keep it as is
+      setLastFeeInfo(prev => prev ? { ...prev, status: undefined } : null);
     }
     
     // Collapse the form after saving
