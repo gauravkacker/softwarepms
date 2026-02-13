@@ -15,6 +15,7 @@ A complete Homeopathic Patient Management System built with Next.js 16, featurin
 - [x] Keyboard shortcuts for faster prescription entry
 - [x] System memory for prescriptions and medicines
 - [x] Repository re-cloned and set up for continued development (February 2026)
+- [x] Prescription settings page for configuring default values (Potency, Quantity, Dose Form, Pattern, Frequency, Duration)
 
 ## Current Structure
 
