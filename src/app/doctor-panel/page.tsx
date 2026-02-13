@@ -149,6 +149,7 @@ export default function DoctorPanelPage() {
   const [medicineSuggestions, setMedicineSuggestions] = useState<string[]>([]);
   const [showMedicineSuggestions, setShowMedicineSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [focusedMedicineIndex, setFocusedMedicineIndex] = useState<number | null>(null);
   
   // Smart parsing rules
   const [smartParsingRules, setSmartParsingRules] = useState<SmartParsingRule[]>([]);
@@ -181,6 +182,7 @@ export default function DoctorPanelPage() {
   // System memory for medicine patterns
   const MEDICINE_MEMORY_KEY = 'homeo_prescription_memory';
   const CUSTOM_MEDICINES_KEY = 'homeo_custom_medicines';
+  const COMBINATION_NAMES_KEY = 'homeo_combination_names';
   
   interface MedicineMemory {
     medicine: string;
@@ -216,17 +218,44 @@ export default function DoctorPanelPage() {
     }
   };
   
-  // Get all medicines for autocomplete (common + custom)
+  // Get saved combination names for autocomplete
+  const getCombinationNames = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(COMBINATION_NAMES_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  };
+  
+  // Save a combination name for autocomplete
+  const saveCombinationName = (name: string) => {
+    if (typeof window === 'undefined' || !name.trim()) return;
+    const comboNames = getCombinationNames();
+    const lowerName = name.toLowerCase().trim();
+    if (!comboNames.some(n => n.toLowerCase() === lowerName)) {
+      comboNames.push(name.trim());
+      localStorage.setItem(COMBINATION_NAMES_KEY, JSON.stringify(comboNames));
+    }
+  };
+  
+  // Get all medicines for autocomplete (common + custom + combinations)
   const getAllMedicinesForAutocomplete = (query: string): string[] => {
     const customMeds = getCustomMedicines();
+    const comboNames = getCombinationNames();
+    
     const filteredCustom = customMeds.filter(m => 
       m.toLowerCase().includes(query.toLowerCase())
+    );
+    const filteredCombos = comboNames.filter(c => 
+      c.toLowerCase().includes(query.toLowerCase())
     );
     const filteredCommon = commonMedicines.filter(m => 
       m.toLowerCase().includes(query.toLowerCase())
     );
-    // Combine, prioritize custom medicines
-    return [...new Set([...filteredCustom, ...filteredCommon])].slice(0, 10);
+    // Combine, prioritize custom medicines and combinations
+    return [...new Set([...filteredCustom, ...filteredCombos, ...filteredCommon])].slice(0, 10);
   };
   
   const getMedicineMemory = (): Record<string, MedicineMemory> => {
@@ -739,9 +768,10 @@ export default function DoctorPanelPage() {
   const handleMedicineSearchChange = (index: number, value: string) => {
     setMedicineSearchQuery(value);
     updatePrescriptionRow(index, 'medicine', value);
+    setFocusedMedicineIndex(index);
     
     if (value.trim().length > 0) {
-      // Use all medicines (common + custom) for autocomplete
+      // Use all medicines (common + custom + combinations) for autocomplete
       const suggestions = getAllMedicinesForAutocomplete(value);
       setMedicineSuggestions(suggestions);
       setShowMedicineSuggestions(true);
@@ -757,67 +787,84 @@ export default function DoctorPanelPage() {
     index: number,
     totalRows: number
   ) => {
-    if (!showMedicineSuggestions) {
-      // Handle Tab/Enter for navigation when suggestions are hidden
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        // Apply smart parsing when Enter is pressed
+    // Handle Enter key - always prevent default to avoid form submission
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      // If suggestions are shown and one is selected, select it
+      if (showMedicineSuggestions && selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
+        selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
+      } else {
+        // No suggestion selected - try to load saved pattern for the entered medicine
         const rx = prescriptions[index];
         if (rx.medicine.trim()) {
-          // Parse the medicine text with smart rules
-          const parsed = parseSmartEntry(rx.medicine, smartParsingRules);
-          setPrescriptions(prev => {
-            const updated = [...prev];
-            // Only update fields that were parsed (have values)
-            if (parsed.quantity) updated[index] = { ...updated[index], ...parsed };
-            return updated;
-          });
-          // Save pattern to memory
-          saveMedicineToMemory(rx.medicine, rx.potency || '', prescriptions[index]);
+          // First try to load saved pattern from memory
+          const savedPattern = getMedicinePattern(rx.medicine, rx.potency || '');
+          if (savedPattern) {
+            // Apply saved pattern
+            setPrescriptions(prev => {
+              const updated = [...prev];
+              updated[index] = {
+                ...updated[index],
+                quantity: savedPattern.quantity,
+                doseForm: savedPattern.doseForm,
+                dosePattern: savedPattern.dosePattern,
+                frequency: savedPattern.frequency,
+                duration: savedPattern.duration,
+              };
+              return updated;
+            });
+          } else {
+            // No saved pattern - try smart parsing
+            const parsed = parseSmartEntry(rx.medicine, smartParsingRules);
+            if (parsed.medicine) {
+              setPrescriptions(prev => {
+                const updated = [...prev];
+                updated[index] = { ...updated[index], ...parsed };
+                return updated;
+              });
+            }
+          }
+          // Save to custom medicines list
+          saveCustomMedicine(rx.medicine);
         }
-        // Add new row if on last row
-        if (index === totalRows - 1) {
-          addEmptyPrescriptionRow();
-        }
+      }
+      
+      // Hide suggestions and add new row if on last row
+      setShowMedicineSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+      setFocusedMedicineIndex(null);
+      if (index === totalRows - 1) {
+        addEmptyPrescriptionRow();
       }
       return;
     }
     
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev => 
-          prev < medicineSuggestions.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
-          selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
-        } else if (prescriptions[index].medicine.trim()) {
-          // Save to memory if no suggestion selected
-          const rx = prescriptions[index];
-          saveMedicineToMemory(rx.medicine, rx.potency || '', rx);
-        }
-        // Add new row if on last row
-        if (index === totalRows - 1) {
-          addEmptyPrescriptionRow();
-        }
-        break;
-      case 'Tab':
-        if (selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
+    // Handle other keys when suggestions are shown
+    if (showMedicineSuggestions) {
+      switch (e.key) {
+        case 'ArrowDown':
           e.preventDefault();
-          selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
-        }
-        break;
-      case 'Escape':
-        setShowMedicineSuggestions(false);
-        setSelectedSuggestionIndex(-1);
-        break;
+          setSelectedSuggestionIndex(prev => 
+            prev < medicineSuggestions.length - 1 ? prev + 1 : prev
+          );
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+          break;
+        case 'Tab':
+          if (selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
+            e.preventDefault();
+            selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
+          }
+          break;
+        case 'Escape':
+          setShowMedicineSuggestions(false);
+          setSelectedSuggestionIndex(-1);
+          setFocusedMedicineIndex(null);
+          break;
+      }
     }
   };
   
@@ -827,6 +874,7 @@ export default function DoctorPanelPage() {
     setMedicineSuggestions([]);
     setSelectedSuggestionIndex(-1);
     setMedicineSearchQuery('');
+    setFocusedMedicineIndex(null);
     
     // Try to load saved pattern for this medicine
     loadSavedPattern(index, medicine, '');
@@ -879,6 +927,10 @@ export default function DoctorPanelPage() {
         };
         return updated;
       });
+      // Save combination name to memory for autocomplete
+      if (combinationName.trim()) {
+        saveCombinationName(combinationName);
+      }
     }
     setEditingCombinationIndex(null);
     setCombinationName('');
@@ -1747,6 +1799,7 @@ Dr. Homeopathic Clinic`);
                                     onChange={(e) => handleMedicineSearchChange(index, e.target.value)}
                                     onKeyDown={(e) => handleMedicineKeyDown(e, index, prescriptions.length)}
                                     onFocus={() => {
+                                      setFocusedMedicineIndex(index);
                                       if (rx.medicine.trim().length > 0) {
                                         const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
                                         setMedicineSuggestions(suggestions);
@@ -1757,6 +1810,7 @@ Dr. Homeopathic Clinic`);
                                       // Delay hiding to allow click on suggestion
                                       setTimeout(() => {
                                         setShowMedicineSuggestions(false);
+                                        setFocusedMedicineIndex(null);
                                       }, 200);
                                     }}
                                     placeholder="Medicine name"
@@ -1765,9 +1819,9 @@ Dr. Homeopathic Clinic`);
                                     }`}
                                     autoComplete="off"
                                   />
-                                  {/* Autocomplete Dropdown */}
-                                  {showMedicineSuggestions && medicineSuggestions.length > 0 && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
+                                  {/* Autocomplete Dropdown - only show for focused input */}
+                                  {showMedicineSuggestions && focusedMedicineIndex === index && medicineSuggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-[100]">
                                       {medicineSuggestions.map((suggestion, i) => (
                                         <button
                                           key={i}

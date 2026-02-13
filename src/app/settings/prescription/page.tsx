@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -27,7 +27,18 @@ const STORAGE_KEY = 'prescription_settings';
 
 export default function PrescriptionSettingsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [settings, setSettings] = useState<PrescriptionSettings>(defaultSettings);
+  const [settings, setSettings] = useState<PrescriptionSettings>(() => {
+    if (typeof window === 'undefined') return defaultSettings;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultSettings;
+      }
+    }
+    return defaultSettings;
+  });
   const [newItems, setNewItems] = useState<Record<string, string>>({
     potency: '',
     quantity: '',
@@ -36,17 +47,6 @@ export default function PrescriptionSettingsPage() {
     frequency: '',
     duration: '',
   });
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setSettings(JSON.parse(saved));
-      } catch {
-        setSettings(defaultSettings);
-      }
-    }
-  }, []);
 
   const saveSettings = (newSettings: PrescriptionSettings) => {
     setSettings(newSettings);
@@ -164,7 +164,7 @@ export default function PrescriptionSettingsPage() {
                 <h3 className="font-medium text-amber-800">How it works</h3>
                 <p className="text-sm text-amber-700 mt-1">
                   When typing in the medicine field, the system will automatically recognize these values and fill the appropriate fields.
-                  For example, typing "Led Pal 200 2dr pills 4-4-4 for 7 days" will auto-fill:
+                  For example, typing &quot;Led Pal 200 2dr pills 4-4-4 for 7 days&quot; will auto-fill:
                 </p>
                 <ul className="text-sm text-amber-700 mt-2 list-disc list-inside">
                   <li>Medicine: Led Pal</li>
