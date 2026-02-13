@@ -427,17 +427,7 @@ export default function DoctorPanelPage() {
       setLastFeeInfo(null);
     }
 
-    // Check for active visit
-    const mockActiveVisit: Visit = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      patientId: id,
-      visitDate: new Date(),
-      visitNumber: 1,
-      status: 'active',
-    };
-    setCurrentVisit(mockActiveVisit);
-    
-    // Load actual past visits from database
+    // Load actual past visits from database first to calculate visit number
     const savedVisits = doctorVisitDb.getByPatient(id) as DoctorVisit[];
     const formattedVisits: Visit[] = savedVisits
       .filter(v => v.status === 'locked' || v.status === 'completed')
@@ -457,6 +447,21 @@ export default function DoctorPanelPage() {
         status: v.status,
       }));
     setPastVisits(formattedVisits);
+    
+    // Calculate next visit number based on past visits
+    const nextVisitNumber = formattedVisits.length > 0 
+      ? Math.max(...formattedVisits.map(v => v.visitNumber)) + 1 
+      : 1;
+    
+    // Check for active visit
+    const mockActiveVisit: Visit = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      patientId: id,
+      visitDate: new Date(),
+      visitNumber: nextVisitNumber,
+      status: 'active',
+    };
+    setCurrentVisit(mockActiveVisit);
   }, [setPatient, setCurrentVisit, setPastVisits, setFeeAmount, setFeeType, setPaymentStatus, setLastFeeInfo]);
 
   // Load patient from URL on mount
@@ -1295,6 +1300,8 @@ Dr. Homeopathic Clinic`);
       // Add copied prescriptions below existing ones
       setPrescriptions(prev => [...prev, ...visitPrescriptions.map(rx => ({ ...rx }))]);
     }
+    // Close the popup after copying
+    setShowPastVisitsPopup(false);
   };
   
   // Load prescriptions for past visits
@@ -1347,30 +1354,33 @@ Dr. Homeopathic Clinic`);
     });
   };
   
-  // Share past visit via WhatsApp
+  // Share past visit via WhatsApp (opens PDF for sharing)
   const sharePastVisitWhatsApp = (visit: Visit) => {
     if (!patient) return;
     
-    const visitRx = pastVisitPrescriptions[visit.id] || [];
-    const prescriptionText = visitRx
-      .filter(rx => rx.medicine.trim())
-      .map((rx, i) => `${i + 1}. ${rx.medicine} ${rx.potency || ''} - ${rx.dosePattern} for ${rx.duration}`)
-      .join('\n');
-    
-    const message = `*Prescription from Dr. Homeopathic Clinic*
-
-Patient: ${patient.firstName} ${patient.lastName}
-Date: ${new Date(visit.visitDate).toLocaleDateString()}
-
-*Medicines:*
-${prescriptionText || 'No medicines prescribed'}
-
-${visit.advice ? `*Advice:* ${visit.advice}` : ''}
-
-Thank you for visiting!`;
-    
-    const whatsappUrl = `https://wa.me/${patient.mobile.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    // Open the PDF in a new window for sharing
+    const pdfContent = generatePastVisitPDFContent(visit);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(pdfContent);
+      printWindow.document.close();
+      
+      // Show instructions for sharing via WhatsApp
+      const instructionDiv = printWindow.document.createElement('div');
+      instructionDiv.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; background: #25D366; color: white; padding: 15px; text-align: center; z-index: 1000;">
+          <p style="margin: 0; font-weight: bold;">To share via WhatsApp:</p>
+          <p style="margin: 5px 0 0 0;">1. Save this page as PDF (Ctrl+S or Cmd+S → Save as PDF)</p>
+          <p style="margin: 5px 0 0 0;">2. Open WhatsApp and attach the PDF file</p>
+        </div>
+      `;
+      printWindow.document.body.insertBefore(instructionDiv, printWindow.document.body.firstChild);
+      
+      // Trigger print dialog
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
   };
   
   // Share past visit via Email
@@ -1401,53 +1411,74 @@ Dr. Homeopathic Clinic`);
     window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
   };
   
-  // Print past visit
-  const printPastVisit = (visit: Visit) => {
+  // Generate PDF content for past visit
+  const generatePastVisitPDFContent = (visit: Visit) => {
     const visitRx = pastVisitPrescriptions[visit.id] || [];
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Prescription - ${new Date(visit.visitDate).toLocaleDateString()}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+          h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
+          .patient-info { margin-bottom: 20px; }
+          .section { margin-bottom: 20px; }
+          .section-title { font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f5f5f5; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Dr. Homeopathic Clinic</h1>
+        <div class="patient-info">
+          <p><strong>Patient:</strong> ${patient?.firstName} ${patient?.lastName}</p>
+          <p><strong>Date:</strong> ${new Date(visit.visitDate).toLocaleDateString()}</p>
+          <p><strong>Visit #:</strong> ${visit.visitNumber}</p>
+        </div>
+        ${visit.caseText ? `<div class="section"><div class="section-title">Case Notes</div><p>${visit.caseText}</p></div>` : ''}
+        ${visitRx.length > 0 ? `
+          <div class="section">
+            <div class="section-title">Prescription</div>
+            <table>
+              <thead>
+                <tr><th>Medicine</th><th>Potency</th><th>Dose</th><th>Duration</th></tr>
+              </thead>
+              <tbody>
+                ${visitRx.map(rx => `<tr><td>${rx.medicine}</td><td>${rx.potency || '-'}</td><td>${rx.dosePattern}</td><td>${rx.duration}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : ''}
+        ${visit.advice ? `<div class="section"><div class="section-title">Advice</div><p>${visit.advice}</p></div>` : ''}
+        ${visit.nextVisit ? `<div class="section"><p><strong>Next Visit:</strong> ${new Date(visit.nextVisit).toLocaleDateString()}</p></div>` : ''}
+      </body>
+      </html>
+    `;
+  };
+
+  // Download past visit as PDF
+  const downloadPastVisitPDF = (visit: Visit) => {
+    const pdfContent = generatePastVisitPDFContent(visit);
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Prescription - ${new Date(visit.visitDate).toLocaleDateString()}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-            h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
-            .patient-info { margin-bottom: 20px; }
-            .section { margin-bottom: 20px; }
-            .section-title { font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <h1>Dr. Homeopathic Clinic</h1>
-          <div class="patient-info">
-            <p><strong>Patient:</strong> ${patient?.firstName} ${patient?.lastName}</p>
-            <p><strong>Date:</strong> ${new Date(visit.visitDate).toLocaleDateString()}</p>
-          </div>
-          ${visit.caseText ? `<div class="section"><div class="section-title">Case Notes</div><p>${visit.caseText}</p></div>` : ''}
-          ${visitRx.length > 0 ? `
-            <div class="section">
-              <div class="section-title">Prescription</div>
-              <table>
-                <thead>
-                  <tr><th>Medicine</th><th>Potency</th><th>Dose</th><th>Duration</th></tr>
-                </thead>
-                <tbody>
-                  ${visitRx.map(rx => `<tr><td>${rx.medicine}</td><td>${rx.potency || '-'}</td><td>${rx.dosePattern}</td><td>${rx.duration}</td></tr>`).join('')}
-                </tbody>
-              </table>
-            </div>
-          ` : ''}
-          ${visit.advice ? `<div class="section"><div class="section-title">Advice</div><p>${visit.advice}</p></div>` : ''}
-          ${visit.nextVisit ? `<div class="section"><p><strong>Next Visit:</strong> ${new Date(visit.nextVisit).toLocaleDateString()}</p></div>` : ''}
-        </body>
-        </html>
-      `);
+      printWindow.document.write(pdfContent);
+      printWindow.document.close();
+      // Trigger print dialog which allows saving as PDF
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
+
+  // Print past visit
+  const printPastVisit = (visit: Visit) => {
+    const pdfContent = generatePastVisitPDFContent(visit);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(pdfContent);
       printWindow.document.close();
       printWindow.print();
     }
@@ -1631,12 +1662,26 @@ Dr. Homeopathic Clinic`);
                 <section className="bg-white rounded-xl shadow-sm border border-gray-200">
                   <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-gray-800">Prescription</h2>
-                    <button
-                      onClick={addEmptyPrescriptionRow}
-                      className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
-                    >
-                      + Add Medicine
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {pastVisits.length > 0 && (
+                        <button
+                          onClick={openPastVisitsPopup}
+                          className="px-3 py-1 text-sm bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 flex items-center gap-1"
+                          title="Load prescription from past visit"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          Load Rx
+                        </button>
+                      )}
+                      <button
+                        onClick={addEmptyPrescriptionRow}
+                        className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
+                      >
+                        + Add Medicine
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="p-6">
@@ -2414,7 +2459,7 @@ Dr. Homeopathic Clinic`);
                           </p>
                           <p className="text-sm text-gray-500">Visit #{visit.visitNumber}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() => copyPrescriptionFromPastVisit(visit.id)}
                             className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center gap-1"
@@ -2424,6 +2469,16 @@ Dr. Homeopathic Clinic`);
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                             Copy Rx
+                          </button>
+                          <button
+                            onClick={() => downloadPastVisitPDF(visit)}
+                            className="px-3 py-1.5 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 flex items-center gap-1"
+                            title="Download as PDF"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            PDF
                           </button>
                           <button
                             onClick={() => printPastVisit(visit)}
