@@ -298,6 +298,10 @@ export default function DoctorPanelPage() {
   const [isConsultationEnded, setIsConsultationEnded] = useState(false);
   const [pharmacySent, setPharmacySent] = useState(false);
   
+  // Past visits popup state
+  const [showPastVisitsPopup, setShowPastVisitsPopup] = useState(false);
+  const [pastVisitPrescriptions, setPastVisitPrescriptions] = useState<Record<string, Prescription[]>>({});
+  
   // Refs
   const caseTextRef = useRef<HTMLTextAreaElement>(null);
   const medicineInputRef = useRef<HTMLInputElement>(null);
@@ -1273,7 +1277,172 @@ Dr. Homeopathic Clinic`);
     if (visit.caseText) setCaseText(visit.caseText);
     if (visit.diagnosis) setDiagnosis(visit.diagnosis);
     if (visit.advice) setAdvice(visit.advice);
-    setShowHistory(false);
+    setShowPastVisitsPopup(false);
+  };
+  
+  // Copy prescription from past visit to current prescription
+  const copyPrescriptionFromPastVisit = (visitId: string) => {
+    const visitPrescriptions = pastVisitPrescriptions[visitId] || [];
+    if (visitPrescriptions.length > 0) {
+      // Add copied prescriptions below existing ones
+      setPrescriptions(prev => [...prev, ...visitPrescriptions.map(rx => ({ ...rx }))]);
+    }
+  };
+  
+  // Load prescriptions for past visits
+  const loadPastVisitPrescriptions = (visitId: string) => {
+    if (!pastVisitPrescriptions[visitId]) {
+      const rxList = doctorPrescriptionDb.getByVisit(visitId) as Array<{
+        medicine: string;
+        potency?: string;
+        quantity: string;
+        doseForm?: string;
+        dosePattern?: string;
+        frequency?: string;
+        duration?: string;
+        durationDays?: number;
+        bottles?: number;
+        instructions?: string;
+        isCombination?: boolean;
+        combinationName?: string;
+        combinationContent?: string;
+      }>;
+      if (rxList && rxList.length > 0) {
+        setPastVisitPrescriptions(prev => ({
+          ...prev,
+          [visitId]: rxList.map(rx => ({
+            medicine: rx.medicine,
+            potency: rx.potency,
+            quantity: rx.quantity,
+            doseForm: rx.doseForm,
+            dosePattern: rx.dosePattern,
+            frequency: rx.frequency,
+            duration: rx.duration,
+            durationDays: rx.durationDays,
+            bottles: rx.bottles,
+            instructions: rx.instructions,
+            isCombination: rx.isCombination,
+            combinationName: rx.combinationName,
+            combinationContent: rx.combinationContent,
+          }))
+        }));
+      }
+    }
+  };
+  
+  // Open past visits popup
+  const openPastVisitsPopup = () => {
+    setShowPastVisitsPopup(true);
+    // Load prescriptions for all past visits
+    pastVisits.forEach(visit => {
+      loadPastVisitPrescriptions(visit.id);
+    });
+  };
+  
+  // Share past visit via WhatsApp
+  const sharePastVisitWhatsApp = (visit: Visit) => {
+    if (!patient) return;
+    
+    const visitRx = pastVisitPrescriptions[visit.id] || [];
+    const prescriptionText = visitRx
+      .filter(rx => rx.medicine.trim())
+      .map((rx, i) => `${i + 1}. ${rx.medicine} ${rx.potency || ''} - ${rx.dosePattern} for ${rx.duration}`)
+      .join('\n');
+    
+    const message = `*Prescription from Dr. Homeopathic Clinic*
+
+Patient: ${patient.firstName} ${patient.lastName}
+Date: ${new Date(visit.visitDate).toLocaleDateString()}
+
+*Medicines:*
+${prescriptionText || 'No medicines prescribed'}
+
+${visit.advice ? `*Advice:* ${visit.advice}` : ''}
+
+Thank you for visiting!`;
+    
+    const whatsappUrl = `https://wa.me/${patient.mobile.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+  
+  // Share past visit via Email
+  const sharePastVisitEmail = (visit: Visit) => {
+    if (!patient) return;
+    
+    const visitRx = pastVisitPrescriptions[visit.id] || [];
+    const prescriptionText = visitRx
+      .filter(rx => rx.medicine.trim())
+      .map((rx, i) => `${i + 1}. ${rx.medicine} ${rx.potency || ''} - ${rx.dosePattern} for ${rx.duration}`)
+      .join('\n');
+    
+    const subject = encodeURIComponent(`Your Prescription - ${new Date(visit.visitDate).toLocaleDateString()}`);
+    const body = encodeURIComponent(`Dear ${patient.firstName} ${patient.lastName},
+
+Please find your prescription below:
+
+Medicines:
+${prescriptionText || 'No medicines prescribed'}
+
+${visit.advice ? `Advice: ${visit.advice}` : ''}
+
+Thank you for visiting Dr. Homeopathic Clinic!
+
+Best regards,
+Dr. Homeopathic Clinic`);
+    
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+  };
+  
+  // Print past visit
+  const printPastVisit = (visit: Visit) => {
+    const visitRx = pastVisitPrescriptions[visit.id] || [];
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Prescription - ${new Date(visit.visitDate).toLocaleDateString()}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .patient-info { margin-bottom: 20px; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-weight: bold; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Dr. Homeopathic Clinic</h1>
+          <div class="patient-info">
+            <p><strong>Patient:</strong> ${patient?.firstName} ${patient?.lastName}</p>
+            <p><strong>Date:</strong> ${new Date(visit.visitDate).toLocaleDateString()}</p>
+          </div>
+          ${visit.caseText ? `<div class="section"><div class="section-title">Case Notes</div><p>${visit.caseText}</p></div>` : ''}
+          ${visitRx.length > 0 ? `
+            <div class="section">
+              <div class="section-title">Prescription</div>
+              <table>
+                <thead>
+                  <tr><th>Medicine</th><th>Potency</th><th>Dose</th><th>Duration</th></tr>
+                </thead>
+                <tbody>
+                  ${visitRx.map(rx => `<tr><td>${rx.medicine}</td><td>${rx.potency || '-'}</td><td>${rx.dosePattern}</td><td>${rx.duration}</td></tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+          ${visit.advice ? `<div class="section"><div class="section-title">Advice</div><p>${visit.advice}</p></div>` : ''}
+          ${visit.nextVisit ? `<div class="section"><p><strong>Next Visit:</strong> ${new Date(visit.nextVisit).toLocaleDateString()}</p></div>` : ''}
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
 
   // ===== RENDER =====
@@ -1392,10 +1561,10 @@ Dr. Homeopathic Clinic`);
                     Pharmacy Queue ({3})
                   </button>
                   <button
-                    onClick={() => setShowHistory(!showHistory)}
+                    onClick={openPastVisitsPopup}
                     className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                   >
-                    {showHistory ? 'Hide' : 'Show'} History
+                    Past Visits ({pastVisits.length})
                   </button>
                   <button
                     onClick={() => setShowMateriaMedica(!showMateriaMedica)}
@@ -2188,48 +2357,207 @@ Dr. Homeopathic Clinic`);
                   </div>
                 </section>
 
-                {/* Past Visits */}
-                {showHistory && pastVisits.length > 0 && (
-                  <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-100">
-                      <h2 className="text-lg font-semibold text-gray-800">Past Visits</h2>
-                    </div>
-                    
-                    <div className="p-4 space-y-3">
-                      {pastVisits.map((visit, index) => (
-                        <div
-                          key={visit.id}
-                          className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
-                          onClick={() => repeatPastVisit(visit)}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                Visit #{visit.visitNumber}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                {new Date(visit.visitDate).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
-                              {visit.diagnosis || 'No diagnosis'}
-                            </span>
-                          </div>
-                          {visit.caseText && (
-                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                              {visit.caseText}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                {/* Past Visits - Moved to popup */}
               </div>
             </main>
           </>
         )}
       </div>
+
+      {/* Past Visits Popup Modal */}
+      {showPastVisitsPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-800">Past Visits</h2>
+              <button
+                onClick={() => setShowPastVisitsPopup(false)}
+                className="p-2 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {pastVisits.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No past visits found
+                </div>
+              ) : (
+                // Sort past visits by date (newest first)
+                [...pastVisits].sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime()).map((visit) => {
+                  const visitRx = pastVisitPrescriptions[visit.id] || [];
+                  return (
+                    <div key={visit.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Visit Header */}
+                      <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {new Date(visit.visitDate).toLocaleDateString('en-IN', { 
+                              weekday: 'long', 
+                              day: 'numeric', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })}
+                          </p>
+                          <p className="text-sm text-gray-500">Visit #{visit.visitNumber}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => copyPrescriptionFromPastVisit(visit.id)}
+                            className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center gap-1"
+                            title="Copy prescription to current"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy Rx
+                          </button>
+                          <button
+                            onClick={() => printPastVisit(visit)}
+                            className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                            title="Print"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            Print
+                          </button>
+                          <button
+                            onClick={() => sharePastVisitWhatsApp(visit)}
+                            className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-1"
+                            title="Share via WhatsApp"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                            </svg>
+                            WhatsApp
+                          </button>
+                          <button
+                            onClick={() => sharePastVisitEmail(visit)}
+                            className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 flex items-center gap-1"
+                            title="Share via Email"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Email
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Visit Content */}
+                      <div className="p-4 space-y-4">
+                        {/* Case Taking */}
+                        {visit.caseText && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Case Notes</h4>
+                            <p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
+                              {visit.caseText}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Prescription */}
+                        {visitRx.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Prescription</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="bg-gray-50">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600">Medicine</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-16">Potency</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-20">Dose</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-24">Duration</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {visitRx.map((rx, idx) => (
+                                    <tr key={idx} className="border-t border-gray-100">
+                                      <td className="px-3 py-2">
+                                        {rx.isCombination ? (
+                                          <span className="text-purple-600 font-medium">{rx.combinationName || rx.medicine}</span>
+                                        ) : (
+                                          rx.medicine
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-600">{rx.potency || '-'}</td>
+                                      <td className="px-3 py-2 text-gray-600">{rx.dosePattern || '-'}</td>
+                                      <td className="px-3 py-2 text-gray-600">{rx.duration || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Additional Notes Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {visit.diagnosis && (
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-700 mb-1">Diagnosis</h4>
+                              <p className="text-sm text-gray-600">{visit.diagnosis}</p>
+                            </div>
+                          )}
+                          {visit.prognosis && (
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-700 mb-1">Prognosis</h4>
+                              <p className="text-sm text-gray-600 capitalize">{visit.prognosis}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Advice */}
+                        {visit.advice && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Advice</h4>
+                            <p className="text-sm text-gray-600">{visit.advice}</p>
+                          </div>
+                        )}
+                        
+                        {/* Next Visit */}
+                        {visit.nextVisit && (
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Next Visit:</span>{' '}
+                            {new Date(visit.nextVisit).toLocaleDateString('en-IN', { 
+                              weekday: 'short', 
+                              day: 'numeric', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })}
+                          </div>
+                        )}
+                        
+                        {/* Tests Required */}
+                        {visit.testsRequired && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Tests Required</h4>
+                            <p className="text-sm text-gray-600">{visit.testsRequired}</p>
+                          </div>
+                        )}
+                        
+                        {/* Remarks */}
+                        {visit.remarksToFrontdesk && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Remarks</h4>
+                            <p className="text-sm text-gray-600">{visit.remarksToFrontdesk}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Combination Medicine Modal */}
       {showCombinationModal && (
