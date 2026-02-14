@@ -33,6 +33,7 @@ function parsePrescriptionText(input: string): ParsedPrescription | null {
   if (!input.trim()) return null;
 
   const text = input.trim().toLowerCase();
+  const originalText = input.trim();
 
   // Common frequency patterns and their conversions
   const frequencyMap: Record<string, { pattern: string; frequency: string }> = {
@@ -51,23 +52,37 @@ function parsePrescriptionText(input: string): ParsedPrescription | null {
   const durationMatch = text.match(/(\d+)\s*(days?|weeks?|months?)/i);
   const duration = durationMatch ? `${durationMatch[1]} ${durationMatch[2]}` : "";
 
-  // Extract quantity - support fractions like "1/2oz", "1/2dr" (e.g., "1/2oz", "1/2dr")
-  // Also support whole numbers like "2dr", "1oz", "30ml"
+  // Extract quantity - support fractions like "1/2oz", "1/2dr"
+  // The fraction may be attached to the unit like "1/2oz" or have space "1/2 oz"
   let quantity = "";
-  const fractionQuantityMatch = text.match(/(\d+)\/(\d+)\s*(dr|oz|ml)\b/i);
+  // Match fraction with unit attached (e.g., "1/2oz") or with space (e.g., "1/2 oz")
+  const fractionQuantityMatch = text.match(/(\d+)\/(\d+)\s*(dr|oz|ml)/i);
   if (fractionQuantityMatch) {
     quantity = `${fractionQuantityMatch[1]}/${fractionQuantityMatch[2]}${fractionQuantityMatch[3]}`;
   } else {
+    // Match whole number quantities - but not if preceded by / (to avoid matching "2" in "1/2oz")
     const wholeQuantityMatch = text.match(/(?<!\/)(\d+)\s*(dr|oz|ml)\b/i);
     if (wholeQuantityMatch) {
       quantity = `${wholeQuantityMatch[1]}${wholeQuantityMatch[2]}`;
     }
   }
 
-  // Extract dose form (pills, drops, tablets, etc.)
-  const doseFormMatch = text.match(/(\d+)\s*(pills?|drops?|tablets?|capsules?|ml|liquid|powder|ointment|cream)\b/i);
-  const doseForm = doseFormMatch ? doseFormMatch[2].toLowerCase() : "";
-  const dosePerIntake = doseFormMatch ? doseFormMatch[1] : "";
+  // Extract dose form (pills, drops, tablets, etc.) - may or may not have a number
+  // First try with number (e.g., "4 pills")
+  let doseForm = "";
+  let dosePerIntake = "";
+  const doseFormWithNumberMatch = text.match(/(\d+)\s*(pills?|drops?|tablets?|capsules?|powder|ointment|cream)\b/i);
+  if (doseFormWithNumberMatch) {
+    doseForm = doseFormWithNumberMatch[2].toLowerCase();
+    dosePerIntake = doseFormWithNumberMatch[1];
+  } else {
+    // Try without number (e.g., "liquid")
+    const doseFormNoNumberMatch = text.match(/\b(pills?|drops?|tablets?|capsules?|liquid|powder|ointment|cream)\b/i);
+    if (doseFormNoNumberMatch) {
+      doseForm = doseFormNoNumberMatch[1].toLowerCase();
+      dosePerIntake = "";
+    }
+  }
 
   // Extract pattern - check for custom patterns like "6-6-6", "1-1-1", "1-0-1" first
   let frequency = "";
@@ -77,16 +92,16 @@ function parsePrescriptionText(input: string): ParsedPrescription | null {
   const customPatternMatch = text.match(/\b(\d+)-(\d+)-(\d+)\b/);
   if (customPatternMatch) {
     pattern = `${customPatternMatch[1]}-${customPatternMatch[2]}-${customPatternMatch[3]}`;
-    // Derive frequency from pattern
+    // Derive frequency from pattern - count non-zero doses for times per day
     const doses = [customPatternMatch[1], customPatternMatch[2], customPatternMatch[3]].map(Number);
-    const totalDoses = doses.reduce((a, b) => a + b, 0);
-    if (totalDoses === 1) {
+    const nonZeroDoses = doses.filter(d => d > 0).length;
+    if (nonZeroDoses === 1) {
       frequency = "OD";
-    } else if (totalDoses === 2) {
+    } else if (nonZeroDoses === 2) {
       frequency = "BD";
-    } else if (totalDoses === 3) {
+    } else if (nonZeroDoses === 3) {
       frequency = "TDS";
-    } else if (totalDoses === 4) {
+    } else if (nonZeroDoses === 4) {
       frequency = "QID";
     }
   } else {
@@ -100,33 +115,72 @@ function parsePrescriptionText(input: string): ParsedPrescription | null {
     }
   }
 
-  // Extract potency (numbers like 200, 30c, 1m, 1M, etc.)
-  // Match potency that's attached to a letter suffix (c, ch, m, x) or standalone numbers that are typical potencies
-  const potencyMatch = text.match(/\b(\d+)(c|ch|m|x)\b/i);
+  // Extract potency - match numbers followed by potency suffix (c, ch, m, x)
+  // Common potencies: 6C, 30C, 200C, 1M, 10M, 30X, 200CH, etc.
+  // The pattern needs to match "1m", "1M", "200c", "200C", "30ch", etc.
+  const potencyMatch = text.match(/\b(\d+)\s*(c|ch|m|x)\b/i);
   let potency = potencyMatch ? `${potencyMatch[1]}${potencyMatch[2].toUpperCase()}` : "";
 
-  // Extract medicine name (first word(s) before potency/quantity)
+  // Extract medicine name - collect words until we hit a potency, quantity, or other marker
+  // We need to identify the medicine name BEFORE potency/quantity/pattern
   let medicineName = "";
-  const words = input.trim().split(/\s+/);
-  for (const word of words) {
+  const words = originalText.split(/\s+/);
+  
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
     const lowerWord = word.toLowerCase();
-    // Stop if we hit a potency (number followed by c/ch/m/x), quantity, dose form, frequency, or duration
-    // Also stop for fractions like "1/2"
-    if (
-      /^\d+[cchmx]?$/i.test(word) || // Potency like 1M, 200C, 30CH
-      /^\d+\/\d+$/.test(word) || // Fraction like 1/2
-      /^\d+$/.test(word) || // Standalone number (could be potency)
-      ["dr", "oz", "ml", "pills", "drops", "tablets", "capsules", "liquid", "powder", "ointment", "cream"].includes(lowerWord) ||
-      Object.keys(frequencyMap).includes(lowerWord) ||
-      ["for", "days", "weeks", "months"].includes(lowerWord) ||
-      /^\d+-\d+-\d+$/.test(word) // Pattern like 6-6-6
-    ) {
+    
+    // Check if this word is a potency (number + c/ch/m/x suffix)
+    // Match patterns like "1M", "200C", "30CH", "10M"
+    if (/^\d+[cchmx]$/i.test(word)) {
+      break; // Stop at potency
+    }
+    
+    // Check if this word is a fraction (like "1/2oz" or "1/2")
+    if (/^\d+\/\d+/.test(word)) {
+      break; // Stop at fraction quantity
+    }
+    
+    // Check if this word is a standalone number that could be potency
+    // Only break if followed by a potency suffix in next word or if it's a typical potency number
+    if (/^\d+$/.test(word)) {
+      // Check if next word is a potency suffix
+      const nextWord = words[i + 1]?.toLowerCase();
+      if (nextWord && /^[cchmx]$/.test(nextWord)) {
+        break; // This number is a potency
+      }
+      // Check if it's a typical potency value (6, 12, 30, 200, 1000, etc.)
+      const numVal = parseInt(word);
+      if ([1, 3, 6, 12, 30, 60, 100, 200, 1000, 10000].includes(numVal) && !potency) {
+        break; // Likely a potency
+      }
+    }
+    
+    // Check for dose forms
+    if (["dr", "oz", "ml", "pills", "drops", "tablets", "capsules", "liquid", "powder", "ointment", "cream"].includes(lowerWord)) {
       break;
     }
+    
+    // Check for frequency keywords
+    if (Object.keys(frequencyMap).includes(lowerWord)) {
+      break;
+    }
+    
+    // Check for duration keywords
+    if (["for", "days", "weeks", "months"].includes(lowerWord)) {
+      break;
+    }
+    
+    // Check for pattern
+    if (/^\d+-\d+-\d+$/.test(word)) {
+      break;
+    }
+    
+    // This word is part of the medicine name
     medicineName = medicineName ? `${medicineName} ${word}` : word;
   }
 
-  // Capitalize medicine name
+  // Capitalize medicine name properly (e.g., "Ars alb" -> "Ars Alb")
   medicineName = medicineName
     .split(" ")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
