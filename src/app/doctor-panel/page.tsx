@@ -410,7 +410,7 @@ export default function DoctorPanelPage() {
   
   // Medicine autocomplete
   const [medicineSearchQuery, setMedicineSearchQuery] = useState('');
-  const [medicineSuggestions, setMedicineSuggestions] = useState<string[]>([]);
+  const [medicineSuggestions, setMedicineSuggestions] = useState<{name: string; content?: string}[]>([]);
   const [showMedicineSuggestions, setShowMedicineSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [focusedMedicineIndex, setFocusedMedicineIndex] = useState<number | null>(null);
@@ -534,25 +534,28 @@ export default function DoctorPanelPage() {
   };
   
   // Get all medicines for autocomplete (common + custom + combinations from both localStorage and database)
-  const getAllMedicinesForAutocomplete = (query: string): string[] => {
+  const getAllMedicinesForAutocomplete = (query: string): {name: string; content?: string}[] => {
     const customMeds = getCustomMedicines();
     const comboNames = getCombinationNames();
-    const dbComboNames = dbCombinations.map(c => c.name);
     
-    // Combine all combination sources
-    const allCombos = [...new Set([...dbComboNames, ...comboNames])];
+    // Build combination list with content from database
+    const dbComboMap = new Map(dbCombinations.map(c => [c.name, c.content]));
+    const allComboNames = [...new Set([...dbComboMap.keys(), ...comboNames])];
     
     const filteredCustom = customMeds.filter(m => 
       m.toLowerCase().includes(query.toLowerCase())
-    );
-    const filteredCombos = allCombos.filter(c => 
+    ).map(m => ({ name: m }));
+    
+    const filteredCombos = allComboNames.filter(c => 
       c.toLowerCase().includes(query.toLowerCase())
-    );
+    ).map(c => ({ name: c, content: dbComboMap.get(c) || '' }));
+    
     const filteredCommon = commonMedicines.filter(m => 
       m.toLowerCase().includes(query.toLowerCase())
-    );
+    ).map(m => ({ name: m }));
+    
     // Combine, prioritize custom medicines and combinations
-    return [...new Set([...filteredCustom, ...filteredCombos, ...filteredCommon])].slice(0, 10);
+    return [...filteredCustom, ...filteredCombos, ...filteredCommon].slice(0, 10);
   };
   
   const getMedicineMemory = (): Record<string, MedicineMemory> => {
@@ -1111,10 +1114,14 @@ export default function DoctorPanelPage() {
       setShowMedicineSuggestions(true);
       setSelectedSuggestionIndex(-1);
     } else {
-      // Show all medicines when field is empty (including database combinations)
-      const dbComboNames = dbCombinations.map(c => c.name);
-      const allCombos = [...new Set([...dbComboNames, ...getCombinationNames()])];
-      const allMeds = [...new Set([...getCustomMedicines(), ...allCombos, ...commonMedicines])].slice(0, 10);
+      // Show all medicines when field is empty (including database combinations with content)
+      const dbComboMap = new Map(dbCombinations.map(c => [c.name, c.content]));
+      const allComboNames = [...new Set([...dbComboMap.keys(), ...getCombinationNames()])];
+      const allMeds: {name: string; content?: string}[] = [
+        ...getCustomMedicines().map(m => ({ name: m })),
+        ...allComboNames.map(c => ({ name: c, content: dbComboMap.get(c) || '' })),
+        ...commonMedicines.slice(0, 5).map(m => ({ name: m }))
+      ].slice(0, 10);
       setMedicineSuggestions(allMeds);
       setShowMedicineSuggestions(true);
       setSelectedSuggestionIndex(-1);
@@ -1209,8 +1216,22 @@ export default function DoctorPanelPage() {
     }
   };
   
-  const selectMedicine = (index: number, medicine: string) => {
-    updatePrescriptionRow(index, 'medicine', medicine);
+  const selectMedicine = (index: number, suggestion: {name: string; content?: string}) => {
+    const medicine = suggestion.name;
+    const isCombination = !!suggestion.content;
+    
+    setPrescriptions(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        medicine: medicine,
+        isCombination: isCombination,
+        combinationName: isCombination ? medicine : undefined,
+        combinationContent: suggestion.content || undefined,
+      };
+      return updated;
+    });
+    
     setShowMedicineSuggestions(false);
     setMedicineSuggestions([]);
     setSelectedSuggestionIndex(-1);
@@ -2369,10 +2390,14 @@ Dr. Homeopathic Clinic`);
                                         const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
                                         setMedicineSuggestions(suggestions);
                                       } else {
-                                        // Show all medicines when field is empty (including database combinations)
-                                        const dbComboNames = dbCombinations.map(c => c.name);
-                                        const allCombos = [...new Set([...dbComboNames, ...getCombinationNames()])];
-                                        const allMeds = [...new Set([...getCustomMedicines(), ...allCombos, ...commonMedicines])].slice(0, 10);
+                                        // Show all medicines when field is empty (including database combinations with content)
+                                        const dbComboMap = new Map(dbCombinations.map(c => [c.name, c.content]));
+                                        const allComboNames = [...new Set([...dbComboMap.keys(), ...getCombinationNames()])];
+                                        const allMeds: {name: string; content?: string}[] = [
+                                          ...getCustomMedicines().map(m => ({ name: m })),
+                                          ...allComboNames.map(c => ({ name: c, content: dbComboMap.get(c) || '' })),
+                                          ...commonMedicines.slice(0, 5).map(m => ({ name: m }))
+                                        ].slice(0, 10);
                                         setMedicineSuggestions(allMeds);
                                       }
                                       setShowMedicineSuggestions(true);
@@ -2402,7 +2427,10 @@ Dr. Homeopathic Clinic`);
                                             i === selectedSuggestionIndex ? 'bg-blue-50 text-blue-700' : ''
                                           }`}
                                         >
-                                          {suggestion}
+                                          <div className="font-medium">{suggestion.name}</div>
+                                          {suggestion.content && (
+                                            <div className="text-xs text-gray-500 mt-0.5">{suggestion.content}</div>
+                                          )}
                                         </button>
                                       ))}
                                     </div>
