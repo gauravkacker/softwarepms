@@ -154,6 +154,10 @@ export default function DoctorPanelPage() {
   // Smart parsing rules
   const [smartParsingRules, setSmartParsingRules] = useState<SmartParsingRule[]>([]);
   
+  // Smart parsing input field
+  const [smartParseInput, setSmartParseInput] = useState('');
+  const smartParseInputRef = useRef<HTMLInputElement>(null);
+  
   // Common homeopathic medicines for autocomplete
   const commonMedicines = [
     'Aconitum napellus', 'Arsenicum album', 'Belladonna', 'Bryonia alba', 'Calcarea carbonica',
@@ -993,6 +997,45 @@ export default function DoctorPanelPage() {
       });
     }
   };
+  
+  // Handle smart parsing input field - parse and add new row on Enter
+  const handleSmartParseInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && smartParseInput.trim()) {
+      e.preventDefault();
+      
+      // Parse the input
+      const parsed = parseSmartEntry(smartParseInput, smartParsingRules);
+      
+      // Add new prescription row with parsed values
+      const newPrescription: Prescription = {
+        medicine: parsed.medicine || smartParseInput.trim(),
+        potency: parsed.potency || '',
+        quantity: parsed.quantity || '1dr',
+        doseForm: parsed.doseForm || 'pills',
+        dosePattern: parsed.dosePattern || '1-1-1',
+        frequency: parsed.frequency || 'Daily',
+        duration: parsed.duration || '7 days',
+        durationDays: parsed.durationDays || 7,
+        bottles: parsed.bottles || 1,
+      };
+      
+      setPrescriptions(prev => [...prev, newPrescription]);
+      
+      // Save medicine to memory and custom list
+      if (newPrescription.medicine) {
+        saveCustomMedicine(newPrescription.medicine);
+        if (newPrescription.potency) {
+          saveMedicineToMemory(newPrescription.medicine, newPrescription.potency, newPrescription);
+        }
+      }
+      
+      // Clear input and keep focus
+      setSmartParseInput('');
+      setTimeout(() => {
+        smartParseInputRef.current?.focus();
+      }, 0);
+    }
+  };
 
   // ===== SAVE FEE =====
   
@@ -1795,6 +1838,30 @@ Dr. Homeopathic Clinic`);
                         + Add Medicine
                       </button>
                     </div>
+                  </div>
+                  
+                  {/* Smart Parsing Input */}
+                  <div className="px-6 pt-4 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 relative">
+                        <input
+                          ref={smartParseInputRef}
+                          type="text"
+                          value={smartParseInput}
+                          onChange={(e) => setSmartParseInput(e.target.value)}
+                          onKeyDown={handleSmartParseInputKeyDown}
+                          placeholder="Smart Parse: Type &quot;Arnica 200 2dr 4 pills TDS for 7 days&quot; and press Enter"
+                          className="w-full px-4 py-2.5 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-amber-50 text-sm"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-amber-600">
+                          <span className="font-medium">Press Enter</span>
+                          <kbd className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-700 font-mono">↵</kbd>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Format: Medicine Potency Quantity DoseForm Pattern Duration (e.g., &quot;Belladonna 200 1dr pills 1-1-1 7 days&quot;)
+                    </p>
                   </div>
                   
                   <div className="p-6">
