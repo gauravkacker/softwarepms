@@ -427,6 +427,23 @@ export default function DoctorPanelPage() {
   const [aiApiKey, setAiApiKey] = useState('');
   const [isAiParsing, setIsAiParsing] = useState(false);
   
+  // Prescription settings (from settings page)
+  const [prescriptionSettings, setPrescriptionSettings] = useState<{
+    potency: string[];
+    quantity: string[];
+    doseForm: string[];
+    pattern: string[];
+    frequency: string[];
+    duration: string[];
+  }>({
+    potency: ['3x', '6c', '6x', '30c', '30x', '200c', '200x', '1M', '10M', '50M', 'CM', 'Q', '1x'],
+    quantity: ['1/2dr', '1dr', '2dr', '1/2oz', '1oz', '2oz', '50ml', '100ml'],
+    doseForm: ['Pills', 'Tabs', 'Drops', 'Liq', 'Powder', 'Sachet', 'Ointment', 'Cream', 'Serum', 'Oil'],
+    pattern: ['1-1-1', '4-4-4', '6-6-6', '15-15-15', '20-20-20', '2-2-2'],
+    frequency: ['Daily', 'Weekly', 'Twice Weekly', 'Thrice Weekly'],
+    duration: ['Day', 'Week', 'Month'],
+  });
+  
   // Common homeopathic medicines for autocomplete
   const commonMedicines = [
     'Aconitum napellus', 'Arsenicum album', 'Belladonna', 'Bryonia alba', 'Calcarea carbonica',
@@ -813,6 +830,17 @@ export default function DoctorPanelPage() {
       }
     } catch (error) {
       console.error('Failed to load AI settings:', error);
+    }
+    
+    // Load prescription settings
+    try {
+      const savedPrescriptionSettings = localStorage.getItem('prescription_settings');
+      if (savedPrescriptionSettings) {
+        const settings = JSON.parse(savedPrescriptionSettings);
+        setPrescriptionSettings(settings);
+      }
+    } catch (error) {
+      console.error('Failed to load prescription settings:', error);
     }
   }, []);
 
@@ -1977,6 +2005,33 @@ Dr. Homeopathic Clinic`);
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Datalists for autocomplete using prescription settings */}
+      <datalist id="potency-list">
+        {prescriptionSettings.potency.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+      <datalist id="quantity-list">
+        {prescriptionSettings.quantity.map((q) => (
+          <option key={q} value={q} />
+        ))}
+      </datalist>
+      <datalist id="pattern-list">
+        {prescriptionSettings.pattern.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+      <datalist id="frequency-list">
+        {prescriptionSettings.frequency.map((f) => (
+          <option key={f} value={f} />
+        ))}
+      </datalist>
+      <datalist id="duration-list">
+        {prescriptionSettings.duration.map((d) => (
+          <option key={d} value={d} />
+        ))}
+      </datalist>
+      
       <Sidebar />
       
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
@@ -2372,6 +2427,7 @@ Dr. Homeopathic Clinic`);
                             <td className="py-2">
                               <input
                                 type="text"
+                                list="potency-list"
                                 value={rx.potency || ''}
                                 onChange={(e) => updatePrescriptionRow(index, 'potency', e.target.value)}
                                 onKeyDown={(e) => handlePotencyKeyDown(e, index, prescriptions.length)}
@@ -2382,6 +2438,7 @@ Dr. Homeopathic Clinic`);
                             <td className="py-2">
                               <input
                                 type="text"
+                                list="quantity-list"
                                 value={rx.quantity}
                                 onChange={(e) => updatePrescriptionRow(index, 'quantity', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -2389,21 +2446,19 @@ Dr. Homeopathic Clinic`);
                             </td>
                             <td className="py-2">
                               <select
-                                value={rx.doseForm || 'pills'}
+                                value={rx.doseForm || 'Pills'}
                                 onChange={(e) => updatePrescriptionRow(index, 'doseForm', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
                               >
-                                <option value="pills">Pills</option>
-                                <option value="drops">Drops</option>
-                                <option value="tablets">Tablets</option>
-                                <option value="liquid">Liquid</option>
-                                <option value="ointment">Ointment</option>
-                                <option value="powder">Powder</option>
+                                {prescriptionSettings.doseForm.map((form) => (
+                                  <option key={form} value={form.toLowerCase()}>{form}</option>
+                                ))}
                               </select>
                             </td>
                             <td className="py-2">
                               <input
                                 type="text"
+                                list="pattern-list"
                                 value={rx.dosePattern}
                                 onChange={(e) => updatePrescriptionRow(index, 'dosePattern', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -2412,6 +2467,7 @@ Dr. Homeopathic Clinic`);
                             <td className="py-2">
                               <input
                                 type="text"
+                                list="frequency-list"
                                 value={rx.frequency}
                                 onChange={(e) => updatePrescriptionRow(index, 'frequency', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -2420,6 +2476,7 @@ Dr. Homeopathic Clinic`);
                             <td className="py-2">
                               <input
                                 type="text"
+                                list="duration-list"
                                 value={rx.duration || ''}
                                 onChange={(e) => updatePrescriptionRow(index, 'duration', e.target.value)}
                                 placeholder="7 days"
