@@ -16,6 +16,7 @@ A complete Homeopathic Patient Management System built with Next.js 16, featurin
 - [x] System memory for prescriptions and medicines
 - [x] Repository re-cloned and set up for continued development (February 2026)
 - [x] Prescription settings page for configuring default values (Potency, Quantity, Dose Form, Pattern, Frequency, Duration)
+- [x] Separate smart parsing input field above prescription table (February 2026)
 
 ## Current Structure
 
@@ -93,3 +94,4 @@ bun typecheck  # TypeScript checking
 | Initial | Template created with base setup |
 | February 2025 | Cloned from softwarepms.git, ready for continued development |
 | February 2026 | Repository re-cloned, dependencies installed, project verified |
+| February 2026 | Added separate smart parsing input field above prescription table |
