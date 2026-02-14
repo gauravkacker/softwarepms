@@ -123,6 +123,45 @@ class LocalDatabase {
     // Smart Parsing
     this.store.set('smartParsingRules', []);
     this.store.set('smartParsingTemplates', []);
+    
+    // Seed default smart parsing rules
+    this.seedDefaultSmartParsingRules();
+  }
+  
+  private seedDefaultSmartParsingRules(): void {
+    const defaultRules = [
+      // Quantity rules
+      { id: 'rule-qty-1', name: 'Drachm', type: 'quantity', pattern: '\\b(\\d+)\\s*dr\\b', replacement: '$1 dr', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-qty-2', name: 'Ounce', type: 'quantity', pattern: '\\b(\\d+)\\s*oz\\b', replacement: '$1 oz', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-qty-3', name: 'Milliliter', type: 'quantity', pattern: '\\b(\\d+)\\s*ml\\b', replacement: '$1 ml', isRegex: true, priority: 10, isActive: true },
+      
+      // Dose Form rules
+      { id: 'rule-form-1', name: 'Pills', type: 'doseForm', pattern: '\\b(pills?)\\b', replacement: 'pills', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-form-2', name: 'Tablet', type: 'doseForm', pattern: '\\b(tablets?|tabs?)\\b', replacement: 'tablets', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-form-3', name: 'Liquid', type: 'doseForm', pattern: '\\b(liq|liquid|solution)\\b', replacement: 'liquid', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-form-4', name: 'Drops', type: 'doseForm', pattern: '\\b(drops?)\\b', replacement: 'drops', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-form-5', name: 'Powder', type: 'doseForm', pattern: '\\b(powders?)\\b', replacement: 'powder', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-form-6', name: 'Ointment', type: 'doseForm', pattern: '\\b(ointment|cream|balm)\\b', replacement: 'ointment', isRegex: true, priority: 10, isActive: true },
+      
+      // Dose Pattern rules
+      { id: 'rule-pattern-1', name: 'OD', type: 'dosePattern', pattern: 'OD', replacement: '1-0-0', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-2', name: 'BD', type: 'dosePattern', pattern: 'BD', replacement: '1-1-0', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-3', name: 'TDS', type: 'dosePattern', pattern: 'TDS', replacement: '1-1-1', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-4', name: 'QID', type: 'dosePattern', pattern: 'QID', replacement: '1-1-1-1', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-5', name: 'SOS', type: 'dosePattern', pattern: 'SOS', replacement: 'SOS', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-6', name: 'HS', type: 'dosePattern', pattern: 'HS', replacement: '0-0-1', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-7', name: 'TID', type: 'dosePattern', pattern: 'TID', replacement: '1-1-1', isRegex: false, priority: 10, isActive: true },
+      { id: 'rule-pattern-8', name: '3 times', type: 'dosePattern', pattern: '3 times', replacement: '1-1-1', isRegex: false, priority: 5, isActive: true },
+      { id: 'rule-pattern-9', name: '2 times', type: 'dosePattern', pattern: '2 times', replacement: '1-1-0', isRegex: false, priority: 5, isActive: true },
+      
+      // Duration rules
+      { id: 'rule-dur-1', name: 'Days', type: 'duration', pattern: '(\\d+)\\s*days?', replacement: '$1 days', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-dur-2', name: 'Weeks', type: 'duration', pattern: '(\\d+)\\s*weeks?', replacement: '$1 weeks', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-dur-3', name: 'Months', type: 'duration', pattern: '(\\d+)\\s*months?', replacement: '$1 months', isRegex: true, priority: 10, isActive: true },
+      { id: 'rule-dur-4', name: 'For X days', type: 'duration', pattern: 'for\\s*(\\d+)\\s*days?', replacement: '$1 days', isRegex: true, priority: 15, isActive: true },
+    ];
+    
+    this.store.set('smartParsingRules', defaultRules);
   }
 
   // Generic CRUD operations

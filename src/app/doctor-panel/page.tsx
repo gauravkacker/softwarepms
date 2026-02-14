@@ -797,53 +797,52 @@ export default function DoctorPanelPage() {
       // If suggestions are shown and one is selected, select it
       if (showMedicineSuggestions && selectedSuggestionIndex >= 0 && medicineSuggestions[selectedSuggestionIndex]) {
         selectMedicine(index, medicineSuggestions[selectedSuggestionIndex]);
+        return; // Don't add new row, just select and autofill
       } else if (showMedicineSuggestions && medicineSuggestions.length > 0) {
         // If suggestions are shown but none selected, select the first one
         selectMedicine(index, medicineSuggestions[0]);
-      } else {
-        // No suggestions - try to load saved pattern for the entered medicine
-        const rx = prescriptions[index];
-        if (rx.medicine.trim()) {
-          // First try to load saved pattern from memory
-          const savedPattern = getMedicinePattern(rx.medicine, rx.potency || '');
-          if (savedPattern) {
-            // Apply saved pattern
-            setPrescriptions(prev => {
-              const updated = [...prev];
-              updated[index] = {
-                ...updated[index],
-                quantity: savedPattern.quantity,
-                doseForm: savedPattern.doseForm,
-                dosePattern: savedPattern.dosePattern,
-                frequency: savedPattern.frequency,
-                duration: savedPattern.duration,
-              };
-              return updated;
-            });
-          } else {
-            // No saved pattern - try smart parsing
-            const parsed = parseSmartEntry(rx.medicine, smartParsingRules);
-            if (parsed.medicine) {
-              setPrescriptions(prev => {
-                const updated = [...prev];
-                updated[index] = { ...updated[index], ...parsed };
-                return updated;
-              });
-            }
-          }
-          // Save to custom medicines list
-          saveCustomMedicine(rx.medicine);
-        }
+        return; // Don't add new row, just select and autofill
       }
       
-      // Hide suggestions and add new row if on last row
+      // No suggestions visible - try to load saved pattern for the entered medicine
+      const rx = prescriptions[index];
+      if (rx.medicine.trim()) {
+        // First try to load saved pattern from memory
+        const savedPattern = getMedicinePattern(rx.medicine, rx.potency || '');
+        if (savedPattern) {
+          // Apply saved pattern
+          setPrescriptions(prev => {
+            const updated = [...prev];
+            updated[index] = {
+              ...updated[index],
+              quantity: savedPattern.quantity,
+              doseForm: savedPattern.doseForm,
+              dosePattern: savedPattern.dosePattern,
+              frequency: savedPattern.frequency,
+              duration: savedPattern.duration,
+            };
+            return updated;
+          });
+        } else {
+          // No saved pattern - try smart parsing
+          const parsed = parseSmartEntry(rx.medicine, smartParsingRules);
+          if (parsed.medicine) {
+            setPrescriptions(prev => {
+              const updated = [...prev];
+              updated[index] = { ...updated[index], ...parsed };
+              return updated;
+            });
+          }
+        }
+        // Save to custom medicines list
+        saveCustomMedicine(rx.medicine);
+      }
+      
+      // Hide suggestions
       setShowMedicineSuggestions(false);
       setSelectedSuggestionIndex(-1);
       setFocusedMedicineIndex(null);
-      if (index === totalRows - 1) {
-        addEmptyPrescriptionRow();
-      }
-      return;
+      return; // Don't add new row on Enter - user can click "Add Medicine" button
     }
     
     // Handle other keys when suggestions are shown
@@ -897,6 +896,24 @@ export default function DoctorPanelPage() {
         };
         return updated;
       });
+    } else {
+      // No saved pattern - try smart parsing on the medicine name
+      const parsed = parseSmartEntry(medicine, smartParsingRules);
+      if (parsed.medicine) {
+        setPrescriptions(prev => {
+          const updated = [...prev];
+          updated[index] = { 
+            ...updated[index], 
+            medicine: medicine, // Keep original medicine name
+            quantity: parsed.quantity,
+            doseForm: parsed.doseForm,
+            dosePattern: parsed.dosePattern,
+            frequency: parsed.frequency,
+            duration: parsed.duration,
+          };
+          return updated;
+        });
+      }
     }
   };
   
