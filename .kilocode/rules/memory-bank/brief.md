@@ -1,23 +1,26 @@
-# Project Brief: Next.js Starter Template
+# Project Brief: HomeoPMS - Homeopathic Patient Management System
 
 ## Purpose
 
-This is a minimal Next.js starter template designed for AI-assisted development. It provides a clean foundation that can be extended to build any type of web application through interaction with an AI assistant.
+HomeoPMS is a comprehensive Homeopathic Patient Management System designed to streamline clinic operations. It helps homeopathic doctors manage patients, prescriptions, appointments, and more with smart features like prescription parsing and combination medicine management.
 
 ## Target Users
 
-- Developers wanting a clean Next.js starting point
-- Users building applications through AI-assisted coding
-- Teams needing a standardized, modern Next.js setup
+- Homeopathic doctors and clinics
+- Medical practitioners needing digital patient records
+- Clinics requiring appointment scheduling and queue management
 
 ## Core Use Case
 
-Users describe what they want to build to an AI assistant, which then expands this template by:
+The system handles the complete workflow of a homeopathic clinic:
 
-1. Adding components and pages as needed
-2. Installing additional dependencies
-3. Setting up databases, authentication, etc. using recipes
-4. Customizing styling and branding
+1. Patient registration and management
+2. Appointment scheduling
+3. Prescription writing with smart parsing
+4. Queue management for patient flow
+5. Visit history tracking
+6. Settings configuration (fees, registration, time slots)
+7. Admin functions (user management, activity logs)
 
 ## Key Requirements
 
@@ -27,22 +30,72 @@ Users describe what they want to build to an AI assistant, which then expands th
 - TypeScript for type safety
 - Tailwind CSS 4 for styling
 - ESLint for code quality
-- Clean, minimal starting structure
-- Bun as package manager
+- SQLite database (better-sqlite3)
+- Authentication system
+- Patient CRUD operations
+- Prescription management with smart parsing
+- Appointment scheduling
+- Queue management
 
 ### Nice to Have
 
-- Recipe system for common additions (database, auth)
-- Memory bank for AI context persistence
-- Clear development guidelines
+- SMS/email notifications
+- Multi-user support with roles
+- Activity logging and audit trail
+- Reports and analytics
+- Data backup/restore
 
 ## Success Metrics
 
 - Clean, zero-error TypeScript setup
 - Passing lint and type checks
+- All features functional
+- Smooth user experience
 
 ## Constraints
 
-- Minimal dependencies by default
 - Framework: Next.js 16 + React 19 + Tailwind CSS 4
 - Package manager: Bun
+- Database: SQLite (better-sqlite3)
+- Single-page application (SPA) feel with App Router
+
+## Tech Stack
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Next.js | 16.x | React framework with App Router |
+| React | 19.x | UI library |
+| TypeScript | 5.9.x | Type-safe JavaScript |
+| Tailwind CSS | 4.x | Utility-first CSS |
+| Bun | Latest | Package manager & runtime |
+| better-sqlite3 | Latest | SQLite database |
+
+## Key Features
+
+### 1. Smart Prescription Parsing
+
+Automatically parse and organize prescriptions with intelligent suggestions.
+
+### 2. Combination Medicines
+
+Manage and prescribe combination medicines with ease.
+
+### 3. Patient Management
+
+Complete patient lifecycle management with visit history.
+
+### 4. Appointments
+
+Schedule and manage patient appointments with calendar view.
+
+### 5. Queue System
+
+Organize patient flow and waiting times efficiently.
+
+### 6. Settings
+
+Configure fees, registration details, and time slots.
+
+### 7. Admin Panel
+
+User management and activity logging for audit trails.
