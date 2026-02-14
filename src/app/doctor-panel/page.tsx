@@ -429,12 +429,35 @@ export default function DoctorPanelPage() {
             <label className="block text-sm font-medium text-neutral-300">
               Smart Parse (type prescription and press Enter)
             </label>
-            {aiParsingEnabled && (
-              <span className="flex items-center gap-1 text-xs text-green-400">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                AI Enhanced
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {/* Toggle Switch for AI Parsing */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-400">AI</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newValue = !aiParsingEnabled;
+                    setAiParsingEnabled(newValue);
+                    localStorage.setItem("aiParsingEnabled", String(newValue));
+                  }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-neutral-800 ${
+                    aiParsingEnabled ? "bg-green-500" : "bg-neutral-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      aiParsingEnabled ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+              {aiParsingEnabled && (
+                <span className="flex items-center gap-1 text-xs text-green-400">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  AI Enhanced
+                </span>
+              )}
+            </div>
           </div>
           <div className="relative">
             <input
@@ -455,12 +478,12 @@ export default function DoctorPanelPage() {
           </div>
           <p className="mt-2 text-xs text-neutral-400">
             {aiParsingEnabled 
-              ? "AI parsing enabled - understands natural language prescriptions"
-              : "Format: Medicine Potency Quantity DoseForm Dose Frequency Duration"
+              ? "AI parsing ON - understands natural language prescriptions"
+              : "AI parsing OFF - using basic pattern matching"
             }
-            {!aiParsingEnabled && (
+            {!aiApiKey && aiParsingEnabled && (
               <a href="/settings/ai-parsing" className="ml-2 text-blue-400 hover:text-blue-300">
-                Enable AI parsing (free)
+                Configure API key
               </a>
             )}
           </p>
