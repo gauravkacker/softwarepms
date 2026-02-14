@@ -422,6 +422,11 @@ export default function DoctorPanelPage() {
   const [smartParseInput, setSmartParseInput] = useState('');
   const smartParseInputRef = useRef<HTMLInputElement>(null);
   
+  // AI Parsing settings
+  const [aiParsingEnabled, setAiParsingEnabled] = useState(false);
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [isAiParsing, setIsAiParsing] = useState(false);
+  
   // Common homeopathic medicines for autocomplete
   const commonMedicines = [
     'Aconitum napellus', 'Arsenicum album', 'Belladonna', 'Bryonia alba', 'Calcarea carbonica',
@@ -797,6 +802,18 @@ export default function DoctorPanelPage() {
       }
     };
     loadSmartParsingRules();
+    
+    // Load AI parsing settings
+    try {
+      const savedSettings = localStorage.getItem('aiParsingSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        setAiParsingEnabled(settings.enabled || false);
+        setAiApiKey(settings.apiKey || '');
+      }
+    } catch (error) {
+      console.error('Failed to load AI settings:', error);
+    }
   }, []);
 
   // ===== CASE TAKING =====
@@ -1263,11 +1280,63 @@ export default function DoctorPanelPage() {
   };
   
   // Handle smart parsing input field - parse and add new row on Enter
-  const handleSmartParseInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSmartParseInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && smartParseInput.trim()) {
       e.preventDefault();
       
-      // Parse the input
+      // If AI parsing is enabled and API key is available, use AI
+      if (aiParsingEnabled && aiApiKey) {
+        setIsAiParsing(true);
+        try {
+          const response = await fetch('/api/parse-prescription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              input: smartParseInput,
+              useAI: true,
+              apiKey: aiApiKey,
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.success && data.data) {
+            const parsed = data.data;
+            const newPrescription: Prescription = {
+              medicine: parsed.medicineName || smartParseInput.trim(),
+              potency: parsed.potency || '',
+              quantity: parsed.quantity || '1dr',
+              doseForm: parsed.doseForm || 'pills',
+              dosePattern: parsed.pattern || '1-1-1',
+              frequency: parsed.frequency || 'Daily',
+              duration: parsed.duration || '7 days',
+              durationDays: parsed.duration ? parseInt(parsed.duration) * (parsed.duration.includes('week') ? 7 : parsed.duration.includes('month') ? 30 : 1) : 7,
+              bottles: 1,
+            };
+            
+            setPrescriptions(prev => [...prev, newPrescription]);
+            
+            if (newPrescription.medicine) {
+              saveCustomMedicine(newPrescription.medicine);
+              if (newPrescription.potency) {
+                saveMedicineToMemory(newPrescription.medicine, newPrescription.potency, newPrescription);
+              }
+            }
+            
+            setSmartParseInput('');
+            setTimeout(() => {
+              smartParseInputRef.current?.focus();
+            }, 0);
+            return;
+          }
+        } catch (error) {
+          console.error('AI parsing failed, falling back to regex:', error);
+        } finally {
+          setIsAiParsing(false);
+        }
+      }
+      
+      // Fallback to regex parsing
       const parsed = parseSmartEntry(smartParseInput, smartParsingRules);
       
       // Add new prescription row with parsed values
@@ -2114,17 +2183,36 @@ Dr. Homeopathic Clinic`);
                           value={smartParseInput}
                           onChange={(e) => setSmartParseInput(e.target.value)}
                           onKeyDown={handleSmartParseInputKeyDown}
-                          placeholder="Smart Parse: Type &quot;Arnica 200 2dr 4 pills TDS for 7 days&quot; and press Enter"
+                          placeholder={aiParsingEnabled && aiApiKey ? "AI Smart Parse: Type prescription and press Enter" : "Smart Parse: Type \"Arnica 200 2dr 4 pills TDS for 7 days\" and press Enter"}
                           className="w-full px-4 py-2.5 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-amber-50 text-sm"
+                          disabled={isAiParsing}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs text-amber-600">
-                          <span className="font-medium">Press Enter</span>
-                          <kbd className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-700 font-mono">↵</kbd>
+                          {isAiParsing ? (
+                            <span className="flex items-center gap-1">
+                              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              <span>AI Parsing...</span>
+                            </span>
+                          ) : (
+                            <>
+                              {aiParsingEnabled && aiApiKey && (
+                                <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs mr-1">AI</span>
+                              )}
+                              <span className="font-medium">Press Enter</span>
+                              <kbd className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-700 font-mono">↵</kbd>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      Format: Medicine Potency Quantity DoseForm Pattern Duration (e.g., &quot;Belladonna 200 1dr pills 1-1-1 7 days&quot;)
+                      {aiParsingEnabled && aiApiKey 
+                        ? "AI-powered parsing enabled. Try: \"Ars alb 1M 1/2oz liquid 6-6-6 4 weeks\""
+                        : "Format: Medicine Potency Quantity DoseForm Pattern Duration (e.g., \"Belladonna 200 1dr pills 1-1-1 7 days\")"
+                      }
                     </p>
                   </div>
                   
