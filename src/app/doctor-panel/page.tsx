@@ -273,6 +273,17 @@ export default function DoctorPanelPage() {
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, Record<string, HTMLInputElement | null>>>({});
   const smartParseInputRef = useRef<HTMLInputElement>(null);
+  
+  // AI Parsing settings - initialize from localStorage using lazy initializers
+  const [aiParsingEnabled, setAiParsingEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("aiParsingEnabled") === "true";
+  });
+  const [aiApiKey, setAiApiKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("aiParsingApiKey") || "";
+  });
+  const [isAiParsing, setIsAiParsing] = useState(false);
 
   // Focus on smart parse input on mount
   useEffect(() => {
@@ -280,9 +291,40 @@ export default function DoctorPanelPage() {
   }, []);
 
   // Handle smart parsing on Enter key
-  const handleSmartParseKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSmartParseKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      
+      // Try AI parsing first if enabled
+      if (aiParsingEnabled && aiApiKey) {
+        setIsAiParsing(true);
+        try {
+          const response = await fetch("/api/parse-prescription", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input: smartParseInput, apiKey: aiApiKey }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.success && data.data.medicineName) {
+            const newRow = createRowFromParsed(data.data);
+            setPrescriptionRows((prev) => [...prev, newRow]);
+            setSmartParseInput("");
+            setTimeout(() => {
+              const field = inputRefs.current[newRow.id]?.["medicine"];
+              field?.focus();
+            }, 0);
+            setIsAiParsing(false);
+            return;
+          }
+        } catch (error) {
+          console.error("AI parsing error:", error);
+        }
+        setIsAiParsing(false);
+      }
+      
+      // Fall back to regex parsing
       const parsed = parsePrescriptionText(smartParseInput);
       if (parsed && parsed.medicineName) {
         const newRow = createRowFromParsed(parsed);
@@ -383,20 +425,44 @@ export default function DoctorPanelPage() {
 
         {/* Smart Parsing Input */}
         <div className="mb-6 bg-neutral-800 rounded-lg p-4">
-          <label className="block text-sm font-medium text-neutral-300 mb-2">
-            Smart Parse (type prescription and press Enter)
-          </label>
-          <input
-            ref={smartParseInputRef}
-            type="text"
-            value={smartParseInput}
-            onChange={(e) => setSmartParseInput(e.target.value)}
-            onKeyDown={handleSmartParseKeyDown}
-            placeholder='e.g., "Arnica 200 2dr 4 pills tds for 7 days"'
-            className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-neutral-300">
+              Smart Parse (type prescription and press Enter)
+            </label>
+            {aiParsingEnabled && (
+              <span className="flex items-center gap-1 text-xs text-green-400">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                AI Enhanced
+              </span>
+            )}
+          </div>
+          <div className="relative">
+            <input
+              ref={smartParseInputRef}
+              type="text"
+              value={smartParseInput}
+              onChange={(e) => setSmartParseInput(e.target.value)}
+              onKeyDown={handleSmartParseKeyDown}
+              disabled={isAiParsing}
+              placeholder='e.g., "Arnica 200 2dr 4 pills tds for 7 days"'
+              className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            />
+            {isAiParsing && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </div>
           <p className="mt-2 text-xs text-neutral-400">
-            Format: Medicine Potency Quantity DoseForm Dose Frequency Duration
+            {aiParsingEnabled 
+              ? "AI parsing enabled - understands natural language prescriptions"
+              : "Format: Medicine Potency Quantity DoseForm Dose Frequency Duration"
+            }
+            {!aiParsingEnabled && (
+              <a href="/settings/ai-parsing" className="ml-2 text-blue-400 hover:text-blue-300">
+                Enable AI parsing (free)
+              </a>
+            )}
           </p>
         </div>
 
