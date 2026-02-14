@@ -415,6 +415,9 @@ export default function DoctorPanelPage() {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [focusedMedicineIndex, setFocusedMedicineIndex] = useState<number | null>(null);
   
+  // Database combinations for autocomplete
+  const [dbCombinations, setDbCombinations] = useState<{name: string; content: string}[]>([]);
+  
   // Smart parsing rules
   const [smartParsingRules, setSmartParsingRules] = useState<SmartParsingRule[]>([]);
   
@@ -530,15 +533,19 @@ export default function DoctorPanelPage() {
     }
   };
   
-  // Get all medicines for autocomplete (common + custom + combinations)
+  // Get all medicines for autocomplete (common + custom + combinations from both localStorage and database)
   const getAllMedicinesForAutocomplete = (query: string): string[] => {
     const customMeds = getCustomMedicines();
     const comboNames = getCombinationNames();
+    const dbComboNames = dbCombinations.map(c => c.name);
+    
+    // Combine all combination sources
+    const allCombos = [...new Set([...dbComboNames, ...comboNames])];
     
     const filteredCustom = customMeds.filter(m => 
       m.toLowerCase().includes(query.toLowerCase())
     );
-    const filteredCombos = comboNames.filter(c => 
+    const filteredCombos = allCombos.filter(c => 
       c.toLowerCase().includes(query.toLowerCase())
     );
     const filteredCommon = commonMedicines.filter(m => 
@@ -842,6 +849,20 @@ export default function DoctorPanelPage() {
     } catch (error) {
       console.error('Failed to load prescription settings:', error);
     }
+    
+    // Load combinations from database
+    const loadCombinations = async () => {
+      try {
+        const response = await fetch('/api/doctor-panel/combinations');
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setDbCombinations(data.map((c: { name: string; content: string }) => ({ name: c.name, content: c.content })));
+        }
+      } catch (error) {
+        console.error('Failed to load combinations:', error);
+      }
+    };
+    loadCombinations();
   }, []);
 
   // ===== CASE TAKING =====
@@ -1090,8 +1111,10 @@ export default function DoctorPanelPage() {
       setShowMedicineSuggestions(true);
       setSelectedSuggestionIndex(-1);
     } else {
-      // Show all medicines when field is empty
-      const allMeds = [...new Set([...getCustomMedicines(), ...getCombinationNames(), ...commonMedicines])].slice(0, 10);
+      // Show all medicines when field is empty (including database combinations)
+      const dbComboNames = dbCombinations.map(c => c.name);
+      const allCombos = [...new Set([...dbComboNames, ...getCombinationNames()])];
+      const allMeds = [...new Set([...getCustomMedicines(), ...allCombos, ...commonMedicines])].slice(0, 10);
       setMedicineSuggestions(allMeds);
       setShowMedicineSuggestions(true);
       setSelectedSuggestionIndex(-1);
@@ -2346,8 +2369,10 @@ Dr. Homeopathic Clinic`);
                                         const suggestions = getAllMedicinesForAutocomplete(rx.medicine);
                                         setMedicineSuggestions(suggestions);
                                       } else {
-                                        // Show all medicines when field is empty
-                                        const allMeds = [...new Set([...getCustomMedicines(), ...getCombinationNames(), ...commonMedicines])].slice(0, 10);
+                                        // Show all medicines when field is empty (including database combinations)
+                                        const dbComboNames = dbCombinations.map(c => c.name);
+                                        const allCombos = [...new Set([...dbComboNames, ...getCombinationNames()])];
+                                        const allMeds = [...new Set([...getCustomMedicines(), ...allCombos, ...commonMedicines])].slice(0, 10);
                                         setMedicineSuggestions(allMeds);
                                       }
                                       setShowMedicineSuggestions(true);
