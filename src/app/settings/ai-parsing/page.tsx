@@ -122,9 +122,9 @@ export default function AIParsingSettingsPage() {
           <Card className="p-6 mb-6 bg-green-50 border-green-200">
             <h3 className="text-lg font-semibold text-green-900 mb-2">FREE AI Parsing with Groq</h3>
             <ul className="text-sm text-green-800 space-y-2">
-              <li>• <strong>100% Free:</strong> No credit card required - uses Groq's free API with Llama 3 model</li>
+              <li>• <strong>100% Free:</strong> No credit card required - uses Groq&apos;s free API with Llama 3 model</li>
               <li>• <strong>More Accurate:</strong> AI understands medical abbreviations and context better than regex patterns</li>
-              <li>• <strong>Flexible Input:</strong> Works with various prescription formats like "Ars alb 1M 1/2oz liquid 6-6-6 4 weeks"</li>
+              <li>• <strong>Flexible Input:</strong> Works with various prescription formats like &quot;Ars alb 1M 1/2oz liquid 6-6-6 4 weeks&quot;</li>
               <li>• <strong>Privacy:</strong> Your API key is stored locally and only sent to Groq for parsing</li>
               <li>• <strong>Fallback:</strong> If AI fails, the system automatically falls back to regex parsing</li>
             </ul>

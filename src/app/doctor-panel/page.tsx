@@ -2207,11 +2207,41 @@ Dr. Homeopathic Clinic`);
                           )}
                         </div>
                       </div>
+                      {/* AI Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newEnabled = !aiParsingEnabled;
+                          setAiParsingEnabled(newEnabled);
+                          // Save to localStorage
+                          const savedSettings = localStorage.getItem('aiParsingSettings');
+                          const settings = savedSettings ? JSON.parse(savedSettings) : {};
+                          settings.enabled = newEnabled;
+                          localStorage.setItem('aiParsingSettings', JSON.stringify(settings));
+                        }}
+                        className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                          aiParsingEnabled && aiApiKey ? "bg-green-600" : "bg-gray-300"
+                        }`}
+                        title={aiApiKey ? (aiParsingEnabled ? "AI Parsing ON - Click to disable" : "AI Parsing OFF - Click to enable") : "Set up AI API key in Settings first"}
+                      >
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${
+                            aiParsingEnabled && aiApiKey ? "translate-x-7" : "translate-x-1"
+                          }`}
+                        />
+                        <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-bold ${
+                          aiParsingEnabled && aiApiKey ? "text-white" : "text-gray-500"
+                        }`}>
+                          AI
+                        </span>
+                      </button>
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
                       {aiParsingEnabled && aiApiKey 
                         ? "AI-powered parsing enabled. Try: \"Ars alb 1M 1/2oz liquid 6-6-6 4 weeks\""
-                        : "Format: Medicine Potency Quantity DoseForm Pattern Duration (e.g., \"Belladonna 200 1dr pills 1-1-1 7 days\")"
+                        : aiApiKey 
+                          ? "AI parsing disabled. Toggle ON to use AI, or use format: Medicine Potency Quantity DoseForm Pattern Duration"
+                          : "Format: Medicine Potency Quantity DoseForm Pattern Duration (e.g., \"Belladonna 200 1dr pills 1-1-1 7 days\") - Add API key in Settings for AI parsing"
                       }
                     </p>
                   </div>
