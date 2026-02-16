@@ -28,6 +28,13 @@ interface ParsedPrescription {
   prescriptionText: string;
 }
 
+interface MedicineSuggestion {
+  name: string;
+  type: "medicine" | "combination";
+  content?: string;
+  description?: string;
+}
+
 // Smart Parsing Function
 function parsePrescriptionText(input: string): ParsedPrescription | null {
   if (!input.trim()) return null;
@@ -274,6 +281,13 @@ export default function DoctorPanelPage() {
   const inputRefs = useRef<Record<string, Record<string, HTMLInputElement | null>>>({});
   const smartParseInputRef = useRef<HTMLInputElement>(null);
   
+  // Autocomplete state
+  const [medicineSuggestions, setMedicineSuggestions] = useState<MedicineSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const [activeAutocompleteRowId, setActiveAutocompleteRowId] = useState<string | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  
   // AI Parsing settings - initialize from localStorage using lazy initializers
   const [aiParsingEnabled, setAiParsingEnabled] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -288,6 +302,92 @@ export default function DoctorPanelPage() {
   // Focus on smart parse input on mount
   useEffect(() => {
     smartParseInputRef.current?.focus();
+  }, []);
+
+  // Fetch medicine suggestions
+  const fetchMedicineSuggestions = useCallback(async (query: string, rowId: string) => {
+    if (!query || query.length < 1) {
+      setMedicineSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/medicines/autocomplete?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      
+      const suggestions: MedicineSuggestion[] = [
+        ...(data.medicines || []).map((m: { name: string }) => ({
+          name: m.name,
+          type: "medicine" as const,
+        })),
+        ...(data.combinations || []).map((c: { name: string; content: string; description?: string }) => ({
+          name: c.name,
+          type: "combination" as const,
+          content: c.content,
+          description: c.description,
+        })),
+      ];
+
+      setMedicineSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+      setSelectedSuggestionIndex(0);
+      setActiveAutocompleteRowId(rowId);
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      setMedicineSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, []);
+
+  // Handle suggestion selection
+  const selectSuggestion = (suggestion: MedicineSuggestion) => {
+    if (!activeAutocompleteRowId) return;
+    
+    updateField(activeAutocompleteRowId, "medicine", suggestion.name);
+    setShowSuggestions(false);
+    setMedicineSuggestions([]);
+    setActiveAutocompleteRowId(null);
+    
+    // Focus on potency field after selection
+    setTimeout(() => {
+      const field = inputRefs.current[activeAutocompleteRowId]?.["potency"];
+      field?.focus();
+    }, 0);
+  };
+
+  // Handle keyboard navigation in suggestions
+  const handleSuggestionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: string) => {
+    if (!showSuggestions) {
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => 
+        prev < medicineSuggestions.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => prev > 0 ? prev - 1 : 0);
+    } else if (e.key === "Enter" && medicineSuggestions.length > 0) {
+      e.preventDefault();
+      selectSuggestion(medicineSuggestions[selectedSuggestionIndex]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Handle smart parsing on Enter key
@@ -364,6 +464,14 @@ export default function DoctorPanelPage() {
       "bottles",
     ];
     const currentIndex = fields.indexOf(field);
+
+    // Handle autocomplete navigation for medicine field
+    if (field === "medicine" && showSuggestions) {
+      handleSuggestionKeyDown(e, rowId);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+        return;
+      }
+    }
 
     if (e.key === "Tab") {
       // Let default Tab behavior work for navigation between fields
@@ -510,16 +618,66 @@ export default function DoctorPanelPage() {
               <tbody>
                 {prescriptionRows.map((row) => (
                   <tr key={row.id} className="border-t border-neutral-700">
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 relative">
                       <input
                         ref={(el) => setInputRef(row.id, "medicine", el)}
                         type="text"
                         value={row.medicine}
-                        onChange={(e) => updateField(row.id, "medicine", e.target.value)}
+                        onChange={(e) => {
+                          updateField(row.id, "medicine", e.target.value);
+                          fetchMedicineSuggestions(e.target.value, row.id);
+                        }}
                         onKeyDown={(e) => handleFieldKeyDown(e, row.id, "medicine")}
-                        onFocus={() => setActiveRowId(row.id)}
+                        onFocus={() => {
+                          setActiveRowId(row.id);
+                          if (row.medicine) {
+                            fetchMedicineSuggestions(row.medicine, row.id);
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay to allow clicking on suggestions
+                          setTimeout(() => setShowSuggestions(false), 200);
+                        }}
                         className="w-full px-2 py-1.5 bg-neutral-700 border border-neutral-600 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
+                      {/* Autocomplete Dropdown */}
+                      {showSuggestions && activeAutocompleteRowId === row.id && medicineSuggestions.length > 0 && (
+                        <div 
+                          ref={suggestionsRef}
+                          className="absolute z-50 top-full left-0 mt-1 w-80 bg-neutral-700 border border-neutral-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        >
+                          {medicineSuggestions.map((suggestion, i) => (
+                            <button
+                              key={`${suggestion.type}-${suggestion.name}`}
+                              onClick={() => selectSuggestion(suggestion)}
+                              className={`w-full text-left px-3 py-2 ${
+                                i === selectedSuggestionIndex 
+                                  ? "bg-blue-600 text-white" 
+                                  : "hover:bg-neutral-600"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{suggestion.name}</span>
+                                {suggestion.type === "combination" && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-purple-600 rounded text-purple-100">
+                                    Combo
+                                  </span>
+                                )}
+                              </div>
+                              {suggestion.type === "combination" && suggestion.content && (
+                                <div className="text-xs text-neutral-300 mt-0.5">
+                                  {suggestion.content}
+                                </div>
+                              )}
+                              {suggestion.type === "combination" && suggestion.description && (
+                                <div className="text-xs text-neutral-400 mt-0.5 italic">
+                                  {suggestion.description}
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <input
