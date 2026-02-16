@@ -17,6 +17,7 @@ A complete Homeopathic Patient Management System built with Next.js 16, featurin
 - [x] Repository re-cloned and set up for continued development (February 2026)
 - [x] Prescription settings page for configuring default values (Potency, Quantity, Dose Form, Pattern, Frequency, Duration)
 - [x] Separate smart parsing input field above prescription table (February 2026)
+- [x] Fixed combination medicine autocomplete - initialized database stores and added seed data for 20 common homeopathic combinations (Bioplasgen No. 1-12, Five Phos, BC-1 to BC-6)
 
 ## Current Structure
 
@@ -95,3 +96,4 @@ bun typecheck  # TypeScript checking
 | February 2025 | Cloned from softwarepms.git, ready for continued development |
 | February 2026 | Repository re-cloned, dependencies installed, project verified |
 | February 2026 | Added separate smart parsing input field above prescription table |
+| February 2026 | Fixed combination medicine autocomplete - added database store initialization and seed data |
