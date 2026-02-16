@@ -446,6 +446,46 @@ export default function DoctorPanelPage() {
     );
   };
 
+  // Auto-save combination when medicine field contains a combination pattern
+  const saveCombinationIfNeeded = async (medicineName: string) => {
+    // Check if the medicine name looks like a combination (contains "+" or " + ")
+    const combinationPattern = /^(.+?)\s*\+\s*(.+)$/;
+    const match = medicineName.match(combinationPattern);
+    
+    if (!match) return; // Not a combination
+    
+    // Extract combination name and content
+    // If it's like "ABC (Arnica + Belladonna + Calendula)" - use the short name
+    // If it's like "Arnica + Belladonna + Calendula" - use the full string as content
+    const shortNameMatch = medicineName.match(/^([A-Z]{2,})\s*\((.+)\)$/i);
+    
+    let name: string;
+    let content: string;
+    
+    if (shortNameMatch) {
+      // Format: "ABC (Arnica + Belladonna + Calendula)"
+      name = shortNameMatch[1];
+      content = shortNameMatch[2];
+    } else {
+      // Format: "Arnica + Belladonna + Calendula"
+      // Use the full string as both name and content
+      content = medicineName;
+      // Generate a short name from initials
+      const parts = medicineName.split(/\s*\+\s*/);
+      name = parts.map(p => p.charAt(0).toUpperCase()).join('');
+    }
+    
+    try {
+      await fetch("/api/combinations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, content }),
+      });
+    } catch (error) {
+      console.error("Error saving combination:", error);
+    }
+  };
+
   // Handle key navigation within prescription rows
   const handleFieldKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
@@ -637,6 +677,10 @@ export default function DoctorPanelPage() {
                         onBlur={() => {
                           // Delay to allow clicking on suggestions
                           setTimeout(() => setShowSuggestions(false), 200);
+                          // Auto-save combination if the medicine name contains "+"
+                          if (row.medicine && row.medicine.includes("+")) {
+                            saveCombinationIfNeeded(row.medicine);
+                          }
                         }}
                         className="w-full px-2 py-1.5 bg-neutral-700 border border-neutral-600 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
