@@ -124,6 +124,11 @@ class LocalDatabase {
     this.store.set('smartParsingRules', []);
     this.store.set('smartParsingTemplates', []);
     
+    // Doctor Panel
+    this.store.set('prescriptions', []);
+    this.store.set('combinations', []);
+    this.store.set('medicineUsageMemory', []);
+    
     // Seed default smart parsing rules
     this.seedDefaultSmartParsingRules();
   }
@@ -162,6 +167,36 @@ class LocalDatabase {
     ];
     
     this.store.set('smartParsingRules', defaultRules);
+    
+    // Seed default combination medicines
+    this.seedDefaultCombinations();
+  }
+  
+  private seedDefaultCombinations(): void {
+    const defaultCombinations = [
+      { id: 'combo-1', name: 'Bioplasgen No. 1', content: 'Calcarea fluorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum phosphoricum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+      { id: 'combo-2', name: 'Bioplasgen No. 2', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-3', name: 'Bioplasgen No. 3', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-4', name: 'Bioplasgen No. 4', content: 'Calcarea fluorica 3x, Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+      { id: 'combo-5', name: 'Bioplasgen No. 5', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+      { id: 'combo-6', name: 'Bioplasgen No. 6', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x', showComposition: true },
+      { id: 'combo-7', name: 'Bioplasgen No. 7', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-8', name: 'Bioplasgen No. 8', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+      { id: 'combo-9', name: 'Bioplasgen No. 9', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-10', name: 'Bioplasgen No. 10', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+      { id: 'combo-11', name: 'Bioplasgen No. 11', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-12', name: 'Bioplasgen No. 12', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+      { id: 'combo-13', name: 'Five Phos', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum phosphoricum 3x', showComposition: true },
+      { id: 'combo-14', name: 'Five Phos with Ferrum', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum phosphoricum 3x, Ferrum metallicum 3x', showComposition: true },
+      { id: 'combo-15', name: 'BC-1', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-16', name: 'BC-2', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x', showComposition: true },
+      { id: 'combo-17', name: 'BC-3', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-18', name: 'BC-4', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x', showComposition: true },
+      { id: 'combo-19', name: 'BC-5', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x', showComposition: true },
+      { id: 'combo-20', name: 'BC-6', content: 'Calcarea phosphorica 3x, Ferrum phosphoricum 3x, Kali muriaticum 3x, Kali phosphoricum 3x, Magnesia phosphorica 3x, Natrum muriaticum 3x, Natrum sulphuricum 3x, Silicea 3x', showComposition: true },
+    ];
+    
+    this.store.set('combinations', defaultCombinations);
   }
 
   // Generic CRUD operations
